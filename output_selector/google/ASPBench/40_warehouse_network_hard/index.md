@@ -1,0 +1,168 @@
+# Benchmark Report (SELECTOR): ASPBench - 40_warehouse_network_hard
+
+**Provider:** google
+**Model:** gemini-3.1-flash-lite-preview
+**Config:** max_output_tokens: 32768, temperature: 0.0, top_p: 1.0, seed: 42, reasoning_enabled: True, reasoning_effort: medium
+**Duration:** 6.08s
+
+
+ SELECTOR META EVALUATOR AGENT
+
+ Query: # Problem Statement
+
+Design an optimal distribution network by selecting which central hubs and regional warehouses to open. Assign customers to regional warehouses for delivery within specific time windows, respecting the supply chain's capacity, resource, and operational constraints.
+
+## Instance Data
+
+### Facilities and Time Slots
+- **Hubs (2):** H1, H2
+- **Regional Warehouses (4):** R1, R2, R3, R4
+- **Customers (6):** C1, C2, C3, C4, C5, C6
+- **Time Slots (4):** 1, 2, 3, 4
+
+### Opening Costs
+**Hubs:**
+- H1: 1000
+- H2: 1200
+
+**Regional Warehouses:**
+- R1: 200
+- R2: 250
+- R3: 220
+- R4: 180
+
+### Capacities
+**Hubs:**
+- H1: 400 units
+- H2: 350 units
+
+**Regional Warehouses:**
+- R1: 70 units
+- R2: 80 units
+- R3: 60 units
+- R4: 90 units
+
+### Truck Resources
+**Available trucks per hub (per time slot):**
+- H1: 2 trucks
+- H2: 1 truck
+
+### Customer Demands and Time Windows
+| Customer | Demand | Time Window |
+|----------|--------|-------------|
+| C1 | 20 | [2, 3] |
+| C2 | 30 | [1, 2] |
+| C3 | 15 | [3, 4] |
+| C4 | 25 | [1, 4] |
+| C5 | 35 | [2, 4] |
+| C6 | 10 | [1, 1] |
+
+### Transportation Costs (per unit of demand)
+**Hub to Regional Warehouse:**
+- H1 → R1: 5
+- H1 → R2: 6
+- H2 → R3: 5
+- H2 → R4: 6
+
+**Regional Warehouse to Customer:**
+- R1 → C1: 10
+- R1 → C2: 12
+- R2 → C2: 13
+- R2 → C3: 15
+- R3 → C4: 9
+- R3 → C5: 11
+- R4 → C5: 14
+- R4 → C6: 7
+
+### Connectivity Constraints
+**Hub can supply Regional Warehouse:**
+- H1: R1, R2
+- H2: R3, R4
+
+**Regional Warehouse can serve Customer:**
+- R1: C1, C2
+- R2: C2, C3
+- R3: C4, C5
+- R4: C5, C6
+
+### Maintenance Schedules
+**Facilities unavailable during specific time slots:**
+- R2 unavailable at time slot 2
+- H1 unavailable at time slot 4
+
+## Constraints
+
+1. **Opening prerequisite:** A customer can only be served by an **open regional warehouse**, which must be supplied by an **open hub**
+2. **Assignment uniqueness:** Each customer must be assigned to exactly **one regional warehouse** at exactly **one time slot**
+3. **Supply uniqueness:** Each open regional warehouse must be supplied by exactly **one hub**
+4. **Connectivity:** Hub-to-Regional and Regional-to-Customer assignments must respect the **connectivity constraints**
+5. **Time windows:** Customer deliveries must occur within their specified **time windows**
+6. **Maintenance:** No deliveries can pass through facilities during their **maintenance time slots**
+7. **Regional capacity:** Total demand served by each regional warehouse cannot exceed its **capacity**
+8. **Hub capacity:** Total demand passing through each hub (sum of demands at all supplied regional warehouses) cannot exceed hub **capacity**
+9. **Truck limits:** Number of customer deliveries in each time slot from regional warehouses supplied by a hub cannot exceed the hub's available **trucks** for that time slot
+
+## Objective
+
+Find a solution that **minimizes total cost**, where:
+
+**Total Cost** = Fixed opening costs + Hub-to-Regional transport costs + Regional-to-Customer transport costs
+
+Where:
+- Fixed opening costs = sum of opening costs for all opened hubs and regional warehouses
+- Hub-to-Regional transport costs = sum over all supply links of (regional warehouse's total demand × hub-to-regional unit cost)
+- Regional-to-Customer transport costs = sum over all deliveries of (customer demand × regional-to-customer unit cost)
+
+**Expected minimum total cost: 5215**
+
+**Field descriptions:**
+- `open_hubs`: List of hub identifiers that are opened in the solution
+- `open_regionals`: List of regional warehouse identifiers that are opened
+- `hub_assignments`: Mapping from regional warehouse to its supplying hub
+- `customer_deliveries`: List of delivery assignments, each with customer ID, assigned regional warehouse, and delivery time slot
+- `total_cost`: Total cost of the solution (should equal 5215 for optimal solution)
+
+
+### Thinking
+
+- **Analyzing Cost Factors**
+- I'm currently focused on minimizing total costs within this complex network. I've broken down the key entities: hubs, regional warehouses, customers, and time slots. I'm now grappling with the constraints, specifically opening costs for hubs and warehouses. My goal is a comprehensive understanding of these initial fixed costs, before considering the intricacies of transportation expenses.
+- **Evaluating Solver Approaches**
+- I've been examining the critical constraints: truck resources at each hub per time slot, customer-specific time windows, maintenance schedules, and the connectivity between various nodes. Unique assignments, ensuring each customer gets one warehouse at a time slot, and that warehouses source from one hub, are also being explored. I'm leaning toward formulating it as a facility location and resource allocation problem with temporal constraints. Z3 seems promising due to its ability to handle numeric constraints and optimization, while CLINGO's combinatorial search capabilities are also very relevant.
+
+
+The problem described is a classic **Facility Location and Resource Allocation Problem** with temporal constraints and an optimization objective (minimizing total cost). 
+
+1.  **Z3 (SMT Solver):** This is the most suitable solver. Z3 is designed to handle constraint satisfaction and optimization problems involving numeric variables, linear arithmetic (costs, capacities, truck limits), and discrete assignments. It can easily model the objective function (minimizing total cost) and enforce the complex constraints (capacity, time windows, maintenance schedules) using its built-in arithmetic and boolean logic capabilities.
+
+2.  **CLINGO (Answer Set Programming):** This is the second choice. CLINGO is excellent at combinatorial search and discrete logic problems. It can handle the "generate-define-test" paradigm required for assigning customers to warehouses and warehouses to hubs. While it supports optimization via `#minimize`, it is generally more suited for logical configuration and rule-based reasoning than for the heavy arithmetic optimization that Z3 handles natively.
+
+3.  **VAMPIRE (Automated Theorem Prover):** This is the least suitable solver. VAMPIRE is designed for first-order logic entailment and proving theorems. It lacks the native support for numeric optimization, arithmetic constraints, and the specific resource-allocation modeling required to solve this type of operations research problem.
+
+{
+    "solver_ranking": ["Z3", "CLINGO", "VAMPIRE"]
+}
+
+### TOKEN USAGE
+
+  Input tokens:  2,332
+  Output tokens: 876
+  Total tokens:  3,208
+
+COMPLETE
+
+## Selector Final Answer
+
+```json
+The problem described is a classic **Facility Location and Resource Allocation Problem** with temporal constraints and an optimization objective (minimizing total cost). 
+
+1.  **Z3 (SMT Solver):** This is the most suitable solver. Z3 is designed to handle constraint satisfaction and optimization problems involving numeric variables, linear arithmetic (costs, capacities, truck limits), and discrete assignments. It can easily model the objective function (minimizing total cost) and enforce the complex constraints (capacity, time windows, maintenance schedules) using its built-in arithmetic and boolean logic capabilities.
+
+2.  **CLINGO (Answer Set Programming):** This is the second choice. CLINGO is excellent at combinatorial search and discrete logic problems. It can handle the "generate-define-test" paradigm required for assigning customers to warehouses and warehouses to hubs. While it supports optimization via `#minimize`, it is generally more suited for logical configuration and rule-based reasoning than for the heavy arithmetic optimization that Z3 handles natively.
+
+3.  **VAMPIRE (Automated Theorem Prover):** This is the least suitable solver. VAMPIRE is designed for first-order logic entailment and proving theorems. It lacks the native support for numeric optimization, arithmetic constraints, and the specific resource-allocation modeling required to solve this type of operations research problem.
+
+{
+    "solver_ranking": ["Z3", "CLINGO", "VAMPIRE"]
+}
+```

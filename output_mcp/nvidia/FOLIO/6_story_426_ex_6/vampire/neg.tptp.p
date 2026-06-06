@@ -1,0 +1,1 @@
+fof(neg_conclusion, conjecture, ~((manager(james) | in_other_countries(james)) => ~(has_lunch_at_home(james) | working_remotely_from_home(james))) | ~((has_lunch_at_home(james) | working_remotely_from_home(james)) => ~(manager(james) | in_other_countries(james)))).

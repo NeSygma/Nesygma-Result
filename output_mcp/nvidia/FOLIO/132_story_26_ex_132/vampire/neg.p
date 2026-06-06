@@ -1,0 +1,1 @@
+fof(some_mammal_has_teeth, axiom, ? [X] : (mammal(X) & teeth(X))).\nfof(platypus_no_teeth, axiom, ~teeth(platypus)).\nfof(platypus_is_mammal, axiom, mammal(platypus)).\nfof(human_has_teeth, axiom, teeth(human)).\nfof(neg_conclusion, conjecture, (~mammal(platypus) | teeth(platypus))).

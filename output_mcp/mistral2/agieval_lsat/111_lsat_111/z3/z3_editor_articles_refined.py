@@ -1,0 +1,130 @@
+from z3 import *
+
+solver = Solver()
+
+# Map articles to integers for easier handling
+article_to_int = {
+    'G': 0,
+    'H': 1,
+    'J': 2,
+    'Q': 3,
+    'R': 4,
+    'S': 5,
+    'Y': 6
+}
+int_to_article = {v: k for k, v in article_to_int.items()}
+
+# Assign each position (1-7) an article (as an integer)
+position_articles = [Int(f'pos_article_{i}') for i in range(1, 8)]
+
+# Each position must be assigned an article between 0 and 6
+for i in range(7):
+    solver.add(position_articles[i] >= 0, position_articles[i] <= 6)
+
+# All articles are used exactly once
+solver.add(Distinct(position_articles))
+
+# Helper function to get the article at a position
+def article_at(pos):
+    # pos is 1-based
+    return position_articles[pos-1]
+
+# Helper function to check if an article is at a position
+def is_article_at(pos, article):
+    return article_at(pos) == article_to_int[article]
+
+# Topics: finance (G, H, J), nutrition (Q, R, S), wildlife (Y)
+finance_articles = [article_to_int['G'], article_to_int['H'], article_to_int['J']]
+nutrition_articles = [article_to_int['Q'], article_to_int['R'], article_to_int['S']]
+wildlife_articles = [article_to_int['Y']]
+
+def get_topic(article_int):
+    if article_int in finance_articles:
+        return 0  # finance
+    elif article_int in nutrition_articles:
+        return 1  # nutrition
+    else:
+        return 2  # wildlife
+
+# Consecutive articles cannot cover the same topic
+for i in range(1, 7):
+    topic_i = get_topic(article_at(i))
+    topic_i_plus_1 = get_topic(article_at(i+1))
+    solver.add(topic_i != topic_i_plus_1)
+
+# S can be earlier than Q only if Q is third
+# If S is before Q, then Q must be third
+# We'll use article positions for this constraint
+article_positions = {article: Int(f'pos_{article}') for article in article_to_int.keys()}
+for article in article_to_int.keys():
+    solver.add(article_positions[article] >= 1, article_positions[article] <= 7)
+
+# Link position_articles and article_positions
+for i in range(1, 8):
+    for article in article_to_int.keys():
+        solver.add(Implies(position_articles[i-1] == article_to_int[article], article_positions[article] == i))
+        solver.add(Implies(article_positions[article] == i, position_articles[i-1] == article_to_int[article]))
+
+# Constraint: If S is before Q, then Q must be third
+solver.add(Implies(
+    article_positions['S'] < article_positions['Q'],
+    article_positions['Q'] == 3
+))
+
+# S must be earlier than Y
+solver.add(article_positions['S'] < article_positions['Y'])
+
+# J must be earlier than G, and G must be earlier than R
+solver.add(article_positions['J'] < article_positions['G'])
+solver.add(article_positions['G'] < article_positions['R'])
+
+# G is fourth
+solver.add(article_positions['G'] == 4)
+
+# Now, evaluate the multiple choice options
+found_options = []
+
+# Option A: H is fifth
+solver.push()
+solver.add(article_positions['H'] == 5)
+if solver.check() == sat:
+    found_options.append("A")
+solver.pop()
+
+# Option B: J is first
+solver.push()
+solver.add(article_positions['J'] == 1)
+if solver.check() == sat:
+    found_options.append("B")
+solver.pop()
+
+# Option C: Q is second
+solver.push()
+solver.add(article_positions['Q'] == 2)
+if solver.check() == sat:
+    found_options.append("C")
+solver.pop()
+
+# Option D: S is fifth
+solver.push()
+solver.add(article_positions['S'] == 5)
+if solver.check() == sat:
+    found_options.append("D")
+solver.pop()
+
+# Option E: Y is sixth
+solver.push()
+solver.add(article_positions['Y'] == 6)
+if solver.check() == sat:
+    found_options.append("E")
+solver.pop()
+
+if len(found_options) == 1:
+    print("STATUS: sat")
+    print(f"answer:{found_options[0]}")
+elif len(found_options) > 1:
+    print("STATUS: unsat")
+    print(f"Refine: Multiple options found {found_options}")
+else:
+    print("STATUS: unsat")
+    print("Refine: No options found")

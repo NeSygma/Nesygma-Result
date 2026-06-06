@@ -1,0 +1,64 @@
+# Benchmark Report (SELECTOR): ASPBench - 16_nurse_rostering_hard
+
+**Provider:** openrouter3
+**Model:** xiaomi/mimo-v2-flash
+**Config:** max_output_tokens: 32768, temperature: 0.0, top_p: 1.0, seed: 42, reasoning_enabled: True, reasoning_effort: medium
+**Duration:** 1.39s
+
+
+ SELECTOR META EVALUATOR AGENT
+
+ Query: # Problem Statement
+
+Create a valid work schedule for 5 nurses over a 10-day period that satisfies all hard constraints. This is a constraint satisfaction problem with no optimization objective.
+
+## Instance Data
+
+- **Nurses**: 5 nurses (IDs: 1, 2, 3, 4, 5)
+- **Days**: 10 days (IDs: 1 through 10)
+- **Shifts**: 3 shifts per day:
+  - `1`: Morning Shift
+  - `2`: Evening Shift
+  - `3`: Night Shift
+
+## Constraints
+
+1. **Coverage Requirements**: Each shift on each day must have exactly the required number of nurses:
+   - **Morning Shift (1)**: Exactly 2 nurses
+   - **Evening Shift (2)**: Exactly 1 nurse
+   - **Night Shift (3)**: Exactly 1 nurse
+
+2. **Single Assignment per Day**: A nurse can be assigned to **at most one** shift on any given day.
+
+3. **Rest Period**: A nurse who works a **night shift** (3) on any day **cannot** work the **morning shift** (1) on the following day.
+
+## Objective
+
+Find any valid roster that satisfies **all** hard constraints.
+
+### Field Descriptions
+
+- `roster`: A 10-element array where each element represents a day
+  - Each day is a 3-element array: `[morning_nurses, evening_nurses, night_nurses]`
+  - Each shift is an array of nurse IDs assigned to that shift
+  - If no valid schedule exists, the value should be `null`
+
+{
+    "solver_ranking": ["CLINGO", "Z3", "VAMPIRE"]
+}
+
+### TOKEN USAGE
+
+  Input tokens:  1,528
+  Output tokens: 24
+  Total tokens:  1,552
+
+COMPLETE
+
+## Selector Final Answer
+
+```json
+{
+    "solver_ranking": ["CLINGO", "Z3", "VAMPIRE"]
+}
+```

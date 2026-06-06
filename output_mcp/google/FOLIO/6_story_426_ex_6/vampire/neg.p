@@ -1,0 +1,10 @@
+fof(p1, axiom, ! [X] : ((employee(X) & schedules_meeting(X)) => goes_to_building(X))).
+fof(p2, axiom, ! [X] : ((employee(X) & has_lunch_in_building(X)) => schedules_meeting(X))).
+fof(p3, axiom, ! [X] : (employee(X) => (has_lunch_in_building(X) | has_lunch_at_home(X)))).
+fof(p4, axiom, ! [X] : ((employee(X) & has_lunch_at_home(X)) => works_remotely(X))).
+fof(p5, axiom, ! [X] : ((employee(X) & in_other_country(X)) => works_remotely(X))).
+fof(p6, axiom, ! [X] : (manager(X) => ~works_remotely(X))).
+fof(p7, axiom, (goes_to_building(james) <=> manager(james))).
+fof(p8, axiom, (manager(james) => employee(james))).
+fof(p9, axiom, (in_other_country(james) => employee(james))).
+fof(goal, conjecture, ~((manager(james) | in_other_country(james)) => ~(has_lunch_at_home(james) | works_remotely(james)))).

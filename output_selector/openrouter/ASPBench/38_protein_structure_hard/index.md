@@ -1,0 +1,76 @@
+# Benchmark Report (SELECTOR): ASPBench - 38_protein_structure_hard
+
+**Provider:** openrouter
+**Model:** openai/gpt-oss-120b
+**Config:** max_output_tokens: 32768, temperature: 0.0, top_p: 1.0, seed: 42, reasoning_enabled: True, reasoning_effort: medium
+**Duration:** 4.88s
+
+
+ SELECTOR META EVALUATOR AGENT
+
+ Query: # Problem Statement
+
+Fold a 10-residue protein sequence on a 2D lattice to find a configuration with the minimum possible energy. The HP (Hydrophobic-Polar) model maximizes non-sequential contacts between Hydrophobic (H) residues.
+
+## Instance Data
+
+**Protein Sequence:** HPHPHHPHPH (10 residues)
+
+**Residue Types:**
+- Position 1: H (Hydrophobic)
+- Position 2: P (Polar)
+- Position 3: H (Hydrophobic)
+- Position 4: P (Polar)
+- Position 5: H (Hydrophobic)
+- Position 6: H (Hydrophobic)
+- Position 7: P (Polar)
+- Position 8: H (Hydrophobic)
+- Position 9: P (Polar)
+- Position 10: H (Hydrophobic)
+
+**Energy Model:** Each pair of non-sequential H residues on adjacent lattice points contributes -1 to the total energy.
+
+## Constraints
+
+1. **Self-avoiding walk:** Each residue must occupy a unique lattice point (no two residues at the same position)
+2. **Connectivity:** Consecutive residues in the sequence must occupy adjacent lattice points (Manhattan distance = 1)
+3. **Non-sequential contacts:** Only residue pairs (i, j) where |i - j| > 1 contribute to energy
+4. **Adjacency:** Two lattice points are adjacent if their Manhattan distance equals 1
+
+## Objective
+
+Find a self-avoiding walk on a 2D integer lattice that **minimizes** the total energy.
+
+**Expected minimum energy:** -4
+
+**Field Descriptions:**
+- `sequence`: The protein sequence (must be "HPHPHHPHPH")
+- `coordinates`: List of 10 [x, y] coordinate pairs, one for each residue in sequence order
+
+
+### Thinking
+
+- We need to decide which solver is most suitable for this problem. The problem: folding a protein on a 2D lattice, with constraints: self-avoiding walk, adjacency, maximize contacts (minimize energy). This is a combinatorial optimization / constraint satisfaction problem with positional variables (coordinates) and adjacency constraints, plus objective to minimize energy (or maximize contacts). This is typical for Z3 (SMT) because it deals with integer variables (coordinates), constraints, and can optimize. Also CLINGO could handle it as ASP with generate and test, but the problem includes numeric constraints and optimization (minimize energy). CLINGO can handle optimization via #minimize, but the domain is potentially infinite (2D integer lattice). However we can bound the lattice size (e.g., within some range). Still, Z3 is more natural for integer arithmetic and optimization. VAMPIRE is for first-order logic entailment, not suitable.
+- Thus ranking: Most suitable: Z3. Second: CLINGO (could encode as ASP with bounded grid). Least: VAMPIRE.
+- Return JSON.
+
+
+{
+    "solver_ranking": ["Z3", "CLINGO", "VAMPIRE"]
+}
+
+### TOKEN USAGE
+
+  Input tokens:  1,611
+  Output tokens: 255
+  Total tokens:  1,866
+
+COMPLETE
+
+## Selector Final Answer
+
+```json
+{
+    "solver_ranking": ["Z3", "CLINGO", "VAMPIRE"]
+}
+```

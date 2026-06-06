@@ -1,0 +1,138 @@
+from z3 import *
+
+# BENCHMARK_MODE: ON (model-finding mode)
+BENCHMARK_MODE = True
+
+# Declare symbolic variables for each photographer's assignment
+# Possible values: 0 = None, 1 = Silva, 2 = Thorne
+photographers = ["Frost", "Gonzalez", "Heideck", "Knutson", "Lai", "Mays"]
+assign = {p: Int(f"assign_{p}") for p in photographers}
+
+# Helper function to check if a photographer is assigned to a ceremony
+# ceremony: 1 = Silva, 2 = Thorne
+def is_assigned(p, ceremony):
+    return assign[p] == ceremony
+
+# Helper function to check if a photographer is not assigned to a ceremony
+def not_assigned(p, ceremony):
+    return Not(is_assigned(p, ceremony))
+
+# Helper function to check if a photographer is not assigned at all
+def not_assigned_any(p):
+    return Not(Or([assign[p] == c for c in [1, 2]]))
+
+# Base constraints
+solver = Solver()
+
+# 1. At least two photographers assigned to each ceremony
+for ceremony in [1, 2]:
+    solver.add(Sum([If(is_assigned(p, ceremony), 1, 0) for p in photographers]) >= 2)
+
+# 2. Frost must be assigned together with Heideck to one of the ceremonies
+solver.add(Or(
+    And(is_assigned("Frost", 1), is_assigned("Heideck", 1)),
+    And(is_assigned("Frost", 2), is_assigned("Heideck", 2))
+))
+
+# 3. If Lai and Mays are both assigned, they must be assigned to different ceremonies
+solver.add(Not(And(
+    Not(not_assigned_any("Lai")),
+    Not(not_assigned_any("Mays")),
+    is_assigned("Lai", 1), is_assigned("Mays", 1)
+)))
+solver.add(Not(And(
+    Not(not_assigned_any("Lai")),
+    Not(not_assigned_any("Mays")),
+    is_assigned("Lai", 2), is_assigned("Mays", 2)
+)))
+
+# 4. If Gonzalez is assigned to Silva University, then Lai must be assigned to Thorne University
+solver.add(Implies(
+    is_assigned("Gonzalez", 1),
+    is_assigned("Lai", 2)
+))
+
+# 5. Original constraint: If Knutson is not assigned to Thorne University, then both Heideck and Mays must be assigned to Thorne University
+original_constraint = Implies(
+    not_assigned("Knutson", 2),
+    And(is_assigned("Heideck", 2), is_assigned("Mays", 2))
+)
+solver.add(original_constraint)
+
+# Now, evaluate each answer choice to see which one is equivalent to the original constraint
+
+# Answer choice A: If Knutson is assigned to Silva University, then Heideck and Mays cannot both be assigned to that ceremony.
+opt_a_constr = Implies(
+    is_assigned("Knutson", 1),
+    Not(And(is_assigned("Heideck", 1), is_assigned("Mays", 1)))
+)
+
+# Answer choice B: If Knutson is assigned to Silva University, then Lai must also be assigned to that ceremony.
+opt_b_constr = Implies(
+    is_assigned("Knutson", 1),
+    is_assigned("Lai", 1)
+)
+
+# Answer choice C: Unless Knutson is assigned to Thorne University, both Frost and Mays must be assigned to that ceremony.
+# "Unless P, Q" is equivalent to "If not P, then Q"
+opt_c_constr = Implies(
+    not_assigned("Knutson", 2),
+    And(is_assigned("Frost", 2), is_assigned("Mays", 2))
+)
+
+# Answer choice D: Unless Knutson is assigned to Thorne University, Heideck cannot be assigned to the same ceremony as Lai.
+# "Unless P, Q" is equivalent to "If not P, then Q"
+opt_d_constr = Implies(
+    not_assigned("Knutson", 2),
+    Not(Or(
+        And(is_assigned("Heideck", 1), is_assigned("Lai", 1)),
+        And(is_assigned("Heideck", 2), is_assigned("Lai", 2))
+    ))
+)
+
+# Answer choice E: Unless either Heideck or Mays is assigned to Thorne University, Knutson must be assigned to that ceremony.
+# "Unless P, Q" is equivalent to "If not P, then Q"
+opt_e_constr = Implies(
+    Not(Or(is_assigned("Heideck", 2), is_assigned("Mays", 2))),
+    is_assigned("Knutson", 2)
+)
+
+# Now, check which answer choice is equivalent to the original constraint
+# We need to check if the answer choice is logically equivalent to the original constraint
+# To do this, we check if (original_constraint <=> answer_choice) is a tautology
+# We do this by checking if (original_constraint and not answer_choice) is unsat and (not original_constraint and answer_choice) is unsat
+
+# We will check each option individually to see if it is equivalent to the original constraint
+found_options = []
+
+for letter, constr in [("A", opt_a_constr), ("B", opt_b_constr), ("C", opt_c_constr), ("D", opt_d_constr), ("E", opt_e_constr)]:
+    # Check equivalence: (original_constraint <=> constr) must be a tautology
+    # We check if (original_constraint and not constr) is unsat and (not original_constraint and constr) is unsat
+    
+    # Case 1: original_constraint and not constr
+    solver.push()
+    solver.add(original_constraint)
+    solver.add(Not(constr))
+    result1 = solver.check()
+    solver.pop()
+    
+    # Case 2: not original_constraint and constr
+    solver.push()
+    solver.add(Not(original_constraint))
+    solver.add(constr)
+    result2 = solver.check()
+    solver.pop()
+    
+    # If both cases are unsat, then the two constraints are equivalent
+    if result1 == unsat and result2 == unsat:
+        found_options.append(letter)
+
+if len(found_options) == 1:
+    print("STATUS: sat")
+    print(f"answer:{found_options[0]}")
+elif len(found_options) > 1:
+    print("STATUS: unsat")
+    print(f"Refine: Multiple options found {found_options}")
+else:
+    print("STATUS: unsat")
+    print("Refine: No options found")

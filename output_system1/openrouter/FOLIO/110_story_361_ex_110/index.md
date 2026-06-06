@@ -1,0 +1,73 @@
+# Benchmark Report (SYSTEM1): FOLIO - story_361_ex_110
+
+**Provider:** openrouter
+**Model:** openai/gpt-oss-120b
+**Config:** max_output_tokens: 32768, temperature: 0.0, top_p: 1.0, seed: 42, reasoning_enabled: True, reasoning_effort: medium
+**Duration:** 61.66s
+
+
+ SYSTEM 1 PURE REASONING AGENT
+
+ Query: Consider the following logical premises:
+If people spill a lot of food on their clothing, then they are not notably tidy.
+All clumsy foodies who go out frequently to find new food restaurants to try are people who spill a lot of food on their clothing.
+If people are cleanly, then they are notably tidy.
+If people value order and spotlessness, then they are cleanly.
+All people whose families prioritize order and spotlessness themselves value order and spotlessness.
+Peter is either a person who spills a lot of food on his clothing and is cleanly, or a person who does not spill a lot of food on his clothing and is not cleanly
+
+Conclusion to evaluate:
+Peter is either both a clumsy foodie who goes out frequently to find new food restaurants to try and issomeone whose family prioritizes order and spotlessness, or he neither is a clumsy foodie who goes out frequently to find new food restaurants to try nor does his family prioritize order and spotlessness.
+
+Question: Based STRICTLY on the premises, is the conclusion True, False, or Uncertain?
+Return your final answer in JSON format like this: {"Conclusion": "True or False or Uncertain in here"}
+
+
+
+### Thinking
+
+- We need to parse premises.
+- Premises:
+- 1. If people spill a lot of food on their clothing, then they are not notably tidy. Symbol: Spill -> not tidy.
+- 2. All clumsy foodies who go out frequently to find new food restaurants to try are people who spill a lot of food on their clothing. Symbol: (ClumsyFoodie & FrequentOut) -> Spill.
+- 3. If people are cleanly, then they are notably tidy. Cleanly -> tidy.
+- 4. If people value order and spotlessness, then they are cleanly. ValueOrder -> Cleanly.
+- 5. All people whose families prioritize order and spotlessness themselves value order and spotlessness. FamilyPrioritize -> ValueOrder.
+- 6. Peter is either a person who spills a lot of food on his clothing and is cleanly, or a person who does not spill a lot of food on his clothing and is not cleanly. So (Spill & Cleanly) OR (not Spill & not Cleanly). This is exclusive? Not necessarily exclusive, but it's a disjunction.
+- Conclusion to evaluate:
+- "Peter is either both a clumsy foodie who goes out frequently to find new food restaurants to try and is someone whose family prioritizes order and spotlessness, or he neither is a clumsy foodie who goes out frequently to find new food restaurants to try nor does his family prioritize order and spotlessness."
+- Simplify: (ClumsyFoodie & FrequentOut & FamilyPrioritize) OR (not (ClumsyFoodie & FrequentOut) AND not FamilyPrioritize). Actually "neither is a clumsy foodie ... nor does his family prioritize order and spotlessness" means both not. So second disjunct: (not ClumsyFoodie OR not FrequentOut?) Wait "neither is a clumsy foodie who goes out frequently to find new food restaurants to try nor does his family prioritize order and spotlessness." The phrase "neither ... nor ..." applies to two statements: (Peter is a clumsy foodie who goes out frequently ...) and (his family prioritizes order and spotlessness). So "neither A nor B" means not A and not B. So second disjunct: (not (ClumsyFoodie & FrequentOut)) AND (not FamilyPrioritize). But careful: A is "Peter is a clumsy foodie who goes out frequently to find new food restaurants to try". That's a conjunction of two properties: ClumsyFoodie and FrequentOut. So not A = not (ClumsyFoodie & FrequentOut) = (not ClumsyFoodie) OR (not FrequentOut). So second disjunct: ((not ClumsyFoodie) OR (not FrequentOut)) AND (not FamilyPrioritize). Equivalent to (not FamilyPrioritize) AND (not ClumsyFoodie OR not FrequentOut). That's fine.
+- Thus overall conclusion: (ClumsyFoodie & FrequentOut & FamilyPrioritize) OR (not FamilyPrioritize & (not ClumsyFoodie OR not FrequentOut)).
+- We need to see if this is logically entailed, contradicted, or undetermined given premises.
+- We have limited info about Peter: only the disjunction about Spill & Cleanly.
+- We have no premises linking Spill/Cleanly to ClumsyFoodie/FrequentOut or FamilyPrioritize directly. However we have some chain: FamilyPrioritize -> ValueOrder -> Cleanly -> tidy. Also Cleanly -> tidy. And Spill -> not tidy. So Spill and Cleanly are contradictory regarding tidy: Spill => not tidy, Cleanly => tidy. So if someone both Spill and Cleanly, they'd be both tidy and not tidy, which is contradictory (inconsistent). But logic may allow inconsistency? Usually classical logic, can't have both tidy and not tidy. So the combination (Spill & Cleanly) leads to contradiction, which may be impossible, thus the disjunction may force the other case? Let's examine.
+- Premise 6: (Spill & Cleanly) OR (not Spill & not Cleanly). This is like exclusive? Not exclusive, but it's a logical statement. If (Spill & Cleanly) leads to contradiction, then that branch is impossible, so the only consistent possibility is (not Spill & not Cleanly). However classical logic doesn't enforce consistency unless we have principle of non-contradiction as a rule: we cannot have both tidy and not tidy. Usually we assume consistency. So we can deduce that (Spill & Cleanly) cannot be true because it would imply tidy and not tidy. So we can infer not (Spill & Cleanly). Therefore the disjunction forces (not Spill & not Cleanly) to be true. So we can deduce: not Spill, not Cleanly.
+- Thus we have: Peter does NOT spill a lot, and Peter is NOT cleanly.
+- From not Cleanly, we cannot infer tidy or not tidy directly. But we have Cleanly -> tidy, contrapositive not tidy -> not Cleanly? In classical logic, we cannot infer contrapositive unless we have implication as material implication, we can use contrapositive: If Cleanly -> tidy, then not tidy -> not Cleanly. So from not Cleanly we cannot infer not tidy. So we have no direct about tidy.
+- From not Spill, we cannot infer tidy either.
+- Now we need to evaluate conclusion about ClumsyFoodie & FrequentOut and FamilyPrioritize.
+- We have no premises linking Spill or Cleanly to those. However we have: (ClumsyFoodie & FrequentOut) -> Spill (premise 2). So if Peter were a clumsy foodie frequent, then he would spill. But we have not Spill. So we can infer not (ClumsyFoodie & FrequentOut). Because if he were, then Spill would be true, contradict not Spill. So we can deduce not (ClumsyFoodie & FrequentOut). This is equivalent to (not ClumsyFoodie) OR (not FrequentOut). So we know that at least one of those is false.
+- Now about FamilyPrioritize: we have no direct link to Spill or Cleanly. However FamilyPrioritize -> ValueOrder -> Cleanly. So FamilyPrioritize implies Cleanly. Since we have not Cleanly, we can infer not FamilyPrioritize (by contrapositive: Cleanly -> ... Actually we have FamilyPrioritize -> Cleanly (via chain). So contrapositive: not Cleanly -> not FamilyPrioritize. Yes, if Cleanly is necessary for FamilyPrioritize, then not Cleanly means not FamilyPrioritize. So we can deduce not FamilyPrioritize.
+- Thus we have: not (ClumsyFoodie & FrequentOut) and not FamilyPrioritize.
+- Now evaluate conclusion: (ClumsyFoodie & FrequentOut & FamilyPrioritize) OR (not FamilyPrioritize & (not ClumsyFoodie OR not FrequentOut)). Since we have not FamilyPrioritize true, and we have (not ClumsyFoodie OR not FrequentOut) true (since not (ClumsyFoodie & FrequentOut) is equivalent). So the second disjunct is true. Therefore the whole conclusion is true.
+- Thus based strictly on premises, conclusion is True.
+- Check for any hidden possibility: Could the first disjunct also be true? That would require all three true, but we have not FamilyPrioritize, so cannot. So only second disjunct holds.
+- Thus conclusion is entailed.
+- Therefore answer: {"Conclusion": "True"}
+
+
+{"Conclusion": "True"}
+
+### TOKEN USAGE
+
+  Input tokens:  344
+  Output tokens: 1,550
+  Total tokens:  1,894
+
+COMPLETE
+
+## System 1 Final Answer
+
+```json
+{"Conclusion": "True"}
+```

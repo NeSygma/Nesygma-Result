@@ -1,0 +1,1 @@
+fof(axiom_1, axiom, german(heinrich_schmidt)). fof(axiom_2, axiom, member_of(heinrich_schmidt, prussian_state_parliament)). fof(axiom_3, axiom, member_of(heinrich_schmidt, nazi_reichstag)). fof(conjecture, conjecture, (german(heinrich_schmidt) | russian(heinrich_schmidt))).

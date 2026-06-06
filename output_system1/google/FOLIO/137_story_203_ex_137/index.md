@@ -1,0 +1,39 @@
+# Benchmark Report (SYSTEM1): FOLIO - story_203_ex_137
+
+**Provider:** google
+**Model:** gemini-3.1-flash-lite-preview
+**Config:** max_output_tokens: 32768, temperature: 0.0, top_p: 1.0, seed: 42, reasoning_enabled: True, reasoning_effort: medium
+**Duration:** 5.46s
+
+
+ SYSTEM 1 PURE REASONING AGENT
+
+ Query: Consider the following logical premises:
+Plungers suck.
+Vacuums suck.
+Vampires suck.
+Space is a vacuum.
+A duster is a household appliance that doesn't suck.
+
+Conclusion to evaluate:
+If something is a household appliance, it sucks.
+
+Question: Based STRICTLY on the premises, is the conclusion True, False, or Uncertain?
+Return your final answer in JSON format like this: {"Conclusion": "True or False or Uncertain in here"}
+
+
+{"Conclusion": "False"}
+
+### TOKEN USAGE
+
+  Input tokens:  149
+  Output tokens: 195
+  Total tokens:  344
+
+COMPLETE
+
+## System 1 Final Answer
+
+```json
+{"Conclusion": "False"}
+```

@@ -1,0 +1,73 @@
+# Benchmark Report (MCP): FOLIO - story_380_ex_2
+
+**Provider:** openrouter5
+**Model:** deepseek/deepseek-v4-flash
+**Solver:** vampire
+**Config:** max_output_tokens: 32768, temperature: 0.0, top_p: 1.0, seed: 42, reasoning_enabled: False, reasoning_effort: none
+**Duration:** 28.86s
+
+
+ MCP VAMPIRE AGENT - Symbolic Reasoning
+
+### Query
+Consider the following logical premises: People in this club who perform in school talent shows
+
+often attend and are very engaged with school events. People in this club either perform in school
+talent shows often or are inactive and disinterested community members. People in this club who
+chaperone high school dances are not students who attend the school. All people in this club who are
+inactive and disinterested members of their community chaperone high school dances. All young
+children and teenagers in this club who wish to further their academic careers and educational
+opportunities are students who attend the school. Bonnie is in this club and she either both attends
+and is very engaged with school events and is a student who attends the school or is not someone who
+both attends and is very engaged with school events and is not a student who attends the school.
+Conclusion to evaluate: If Bonnie is either both a young child or teenager who wishes to further her
+academic career and educational opportunities and chaperones high school dances or neither is a
+young child nor teenager who wishes to further her academic career and educational opportunities,
+then Bonnie is either a student who attends the school or is an inactive and disinterested member of
+the community. Question: Based STRICTLY on the premises, is the conclusion True, False, or
+Uncertain? Return your final answer in JSON format like this: {"Conclusion": "True or False or
+Uncertain in here"}
+
+  - write_and_run_vampire: Write two TPTP problem files (positive claim and negation) and run Vampire 
+on both concurrently to get proof results for both in one iteration.
+Returns a dictionary with 'positive' and 'negative' result objects.
+
+## Iteration 1
+
+
+
+
+### TOKEN USAGE - Iteration 1
+
+  Input tokens:  5,222
+  Output tokens: 1,594
+  Total tokens:  6,816
+
+### Tool Call: write_and_run_vampire
+
+  Args: {
+  "pos_filename": "club_problem_pos.p",
+  "pos_code": "% Positive version: original conclusion as conjecture\n\n% Predicates:\n% perform(X)   - X performs in school talent shows often\n% attend_engaged(X) - X attends and is very engaged with school events\n% inactive_disinterested(X) - X is an inactive and disinterested community member\n% chaperone(X) - X chaperones high school dances\n% student(X)   - X is a student who attends the school\n% young_teen(X) - X is a young child or teenager\n% further(X)   - X wishes to further their academic career and educational opportunities\n\n% Distinct entities\nfof(distinct, axiom, bonnie != other).\n\n% Premise 1: People in this club who perform in school talent shows often attend and are very engaged with school events.\nfof(premise1, axiom, ! [X] : (perform(X) => attend_engaged(X))).\n\n% Premise 2: People in this club either perform in school talent shows often or are inactive and disinterested community members.\nfof(premise2, axiom, ! [X] : (perform(X) | inactive_disinterested(X))).\n\n% Premise 3: People in this club who chaperone high school dances are not students who attend the school.\nfof(premise3, axiom, ! [X] : (chaperone(X) => ~student(X))).\n\n% Premise 4: All people in this club who are inactive and disinterested members of their community chaperone high school dances.\nfof(premise4, axiom, ! [X] : (inactive_disinterested(X) => chaperone(X))).\n\n% Premise 5: All young children and teenagers in this club who wish to further their academic careers and educational opportunities are students who attend the school.\nfof(premise5, axiom, ! [X] : ((young_teen(X) & further(X)) => student(X))).\n\n% Premise 6: Bonnie is in this club and she either both attends and is very engaged with school events and is a student who attends the school or is not someone who both attends and is very engaged with school events and is not a student who attends the school.\n% (attend_engaged(bonnie) & student(bonnie)) | (~attend_engaged(bonnie) & ~student(bonnie))\nfof(premise6, axiom, (attend_engaged(bonnie) & student(bonnie)) | (~attend_engaged(bonnie) & ~student(bonnie))).\n\n% Conclusion to evaluate:\n% If Bonnie is either both a young child or teenager who wishes to further her academic career and educational opportunities and chaperones high school dances or neither is a young child nor teenager who wishes to further her academic career and educational opportunities, then Bonnie is either a student who attends the school or is an inactive and disinterested member of the community.\n% Let A = (young_teen(bonnie) & further(bonnie) & chaperone(bonnie))\n% Let B = (~young_teen(bonnie) & ~further(bonnie))\n% Conclusion: (A | B) => (student(bonnie) | inactive_disinterested(bonnie))\n\nfof(conclusion, conjecture, \n    ( ((young_teen(bonnie) & further(bonnie) & chaperone(bonnie)) | (~young_teen(bonnie) & ~further(bonnie))) \n    => (student(bonnie) | inactive_disinterested(bonnie)) )).\n",
+  "neg_filename": "club_problem_neg.p",
+  "neg_code": "% Negative version: negated conclusion as conjecture\n\n% Predicates:\n% perform(X)   - X performs in school talent shows often\n% attend_engaged(X) - X attends and is very engaged with school events\n% inactive_disinterested(X) - X is an inactive and disinterested community member\n% chaperone(X) - X chaperones high school dances\n% student(X)   - X is a student who attends the school\n% young_teen(X) - X is a young child or teenager\n% further(X)   - X wishes to further their academic career and educational opportunities\n\n% Distinct entities\nfof(distinct, axiom, bonnie != other).\n\n% Premise 1: People in this club who perform in school talent shows often attend and are very engaged with school events.\nfof(premise1, axiom, ! [X] : (perform(X) => attend_engaged(X))).\n\n% Premise 2: People in this club either perform in school talent shows often or are inactive and disinterested community members.\nfof(premise2, axiom, ! [X] : (perform(X) | inactive_disinterested(X))).\n\n% Premise 3: People in this club who chaperone high school dances are not students who attend the school.\nfof(premise3, axiom, ! [X] : (chaperone(X) => ~student(X))).\n\n% Premise 4: All people in this club who are inactive and disinterested members of their community chaperone high school dances.\nfof(premise4, axiom, ! [X] : (inactive_disinterested(X) => chaperone(X))).\n\n% Premise 5: All young children and teenagers in this club who wish to further their academic careers and educational opportunities are students who attend the school.\nfof(premise5, axiom, ! [X] : ((young_teen(X) & further(X)) => student(X))).\n\n% Premise 6: Bonnie is in this club and she either both attends and is very engaged with school events and is a student who attends the school or is not someone who both attends and is very engaged with school events and is not a student who attends the school.\nfof(premise6, axiom, (attend_engaged(bonnie) & student(bonnie)) | (~attend_engaged(bonnie) & ~student(bonnie))).\n\n% Negated conclusion:\n% ~( ((young_teen(bonnie) & further(bonnie) & chaperone(bonnie)) | (~young_teen(bonnie) & ~further(bonnie))) \n%    => (student(bonnie) | inactive_disinterested(bonnie)) )\n% Which is equivalent to:\n% ((young_teen(bonnie) & further(bonnie) & chaperone(bonnie)) | (~young_teen(bonnie) & ~further(bonnie))) \n% & ~(student(bonnie) | inactive_disinterested(bonnie))\n% = ((young_teen(bonnie) & further(bonnie) & chaperone(bonnie)) | (~young_teen(bonnie) & ~further(bonnie))) \n% & ~student(bonnie) & ~inactive_disinterested(bonnie)\n\nfof(neg_conclusion, conjecture, \n    ( ((young_teen(bonnie) & further(bonnie) & chaperone(bonnie)) | (~young_teen(bonnie) & ~further(bonnie))) \n    & ~student(bonnie) & ~inactive_disinterested(bonnie) )).\n"
+}
+
+#### Result
+
+[{'type': 'text', 'text': '{"positive":{"status":"success","szs_status":"Theorem","stdout":"% Refutation found. Thanks to Tanya!\\n% SZS status Theorem for club_problem_pos\\n% SZS output start Proof for club_problem_pos\\n2. ! [X0] : (perform(X0) => attend_engaged(X0)) [input(axiom)]\\n3. ! [X0] : (perform(X0) | inactive_disinterested(X0)) [input(axiom)]\\n7. (attend_engaged(bonnie) & student(bonnie)) | (~attend_engaged(bonnie) & ~student(bonnie)) [input(axiom)]\\n8. ((young_teen(bonnie) & further(bonnie) & chaperone(bonnie)) | (~young_teen(bonnie) & ~further(bonnie))) => (student(bonnie) | inactive_disinterested(bonnie)) [input(conjecture)]\\n9. ~(((young_teen(bonnie) & further(bonnie) & chaperone(bonnie)) | (~young_teen(bonnie) & ~further(bonnie))) => (student(bonnie) | inactive_disinterested(bonnie))) [negated conjecture 8]\\n10. ! [X0] : (attend_engaged(X0) | ~perform(X0)) [ennf transformation 2]\\n15. (~student(bonnie) & ~inactive_disinterested(bonnie)) & ((young_teen(bonnie) & further(bonnie) & chaperone(bonnie)) | (~young_teen(bonnie) & ~further(bonnie))) [ennf transformation 9]\\n16. ~student(bonnie) & ~inactive_disinterested(bonnie) & ((young_teen(bonnie) & further(bonnie) & chaperone(bonnie)) | (~young_teen(bonnie) & ~further(bonnie))) [flattening 15]\\n18. ~perform(X0) | attend_engaged(X0) [cnf transformation 10]\\n19. perform(X0) | inactive_disinterested(X0) [cnf transformation 3]\\n24. student(bonnie) | ~attend_engaged(bonnie) [cnf transformation 7]\\n33. ~inactive_disinterested(bonnie) [cnf transformation 16]\\n34. ~student(bonnie) [cnf transformation 16]\\n51. ~attend_engaged(bonnie) [forward subsumption resolution 24,34]\\n52. inactive_disinterested(X0) | attend_engaged(X0) [resolution 19,18]\\n53. attend_engaged(bonnie) [resolution 52,33]\\n55. $false [forward subsumption resolution 53,51]\\n% SZS output end Proof for club_problem_pos\\n% Termination reason: Refutation","stderr":null,"returncode":0},"negative":{"status":"success","szs_status":"CounterSatisfiable","stdout":"% SZS status CounterSatisfiable for club_problem_neg\\n% SZS output start Saturation.\\ncnf(u35,negated_conjecture,\\n    student(bonnie)).\\n\\ncnf(u39,negated_conjecture,\\n    further(bonnie)).\\n\\ncnf(u42,negated_conjecture,\\n    ~young_teen(bonnie)).\\n\\ncnf(u48,negated_conjecture,\\n    ~chaperone(bonnie)).\\n\\ncnf(u52,axiom,\\n    attend_engaged(bonnie)).\\n\\ncnf(u20,axiom,\\n    ~inactive_disinterested(X0) | chaperone(X0)).\\n\\ncnf(u60,axiom,\\n    chaperone(X0) | attend_engaged(X0)).\\n\\ncnf(u17,axiom,\\n    ~perform(X0) | attend_engaged(X0)).\\n\\ncnf(u16,axiom,\\n    bonnie != other).\\n\\ncnf(u19,axiom,\\n    ~student(X0) | ~chaperone(X0)).\\n\\ncnf(u56,axiom,\\n    inactive_disinterested(X0) | attend_engaged(X0)).\\n\\ncnf(u18,axiom,\\n    perform(X0) | inactive_disinterested(X0)).\\n\\ncnf(u21,axiom,\\n    ~further(X0) | ~young_teen(X0) | student(X0)).\\n\\n% SZS output end Saturation.\\n% SZS output start Definitions and Model Updates.\\n% SZS output end Definitions and Model Updates.\\n% Termination reason: Satisfiable","stderr":null,"returncode":0}}', 'id': 'lc_2d2bfc49-4fc6-4fa4-80d0-bb2de8ad9fbc'}]
+
+
+[NOTE] Skipping Answer Phase for FOLIO benchmark as solver returns verdict directly.
+
+TOKEN USAGE SUMMARY
+  Total input tokens:  5,222
+  Total output tokens: 1,594
+  Total tokens:        6,816
+
+COMPLETE
+
+## Final Answer
+
+```json
+[{'type': 'text', 'text': '{"positive":{"status":"success","szs_status":"Theorem","stdout":"% Refutation found. Thanks to Tanya!\\n% SZS status Theorem for club_problem_pos\\n% SZS output start Proof for club_problem_pos\\n2. ! [X0] : (perform(X0) => attend_engaged(X0)) [input(axiom)]\\n3. ! [X0] : (perform(X0) | inactive_disinterested(X0)) [input(axiom)]\\n7. (attend_engaged(bonnie) & student(bonnie)) | (~attend_engaged(bonnie) & ~student(bonnie)) [input(axiom)]\\n8. ((young_teen(bonnie) & further(bonnie) & chaperone(bonnie)) | (~young_teen(bonnie) & ~further(bonnie))) => (student(bonnie) | inactive_disinterested(bonnie)) [input(conjecture)]\\n9. ~(((young_teen(bonnie) & further(bonnie) & chaperone(bonnie)) | (~young_teen(bonnie) & ~further(bonnie))) => (student(bonnie) | inactive_disinterested(bonnie))) [negated conjecture 8]\\n10. ! [X0] : (attend_engaged(X0) | ~perform(X0)) [ennf transformation 2]\\n15. (~student(bonnie) & ~inactive_disinterested(bonnie)) & ((young_teen(bonnie) & further(bonnie) & chaperone(bonnie)) | (~young_teen(bonnie) & ~further(bonnie))) [ennf transformation 9]\\n16. ~student(bonnie) & ~inactive_disinterested(bonnie) & ((young_teen(bonnie) & further(bonnie) & chaperone(bonnie)) | (~young_teen(bonnie) & ~further(bonnie))) [flattening 15]\\n18. ~perform(X0) | attend_engaged(X0) [cnf transformation 10]\\n19. perform(X0) | inactive_disinterested(X0) [cnf transformation 3]\\n24. student(bonnie) | ~attend_engaged(bonnie) [cnf transformation 7]\\n33. ~inactive_disinterested(bonnie) [cnf transformation 16]\\n34. ~student(bonnie) [cnf transformation 16]\\n51. ~attend_engaged(bonnie) [forward subsumption resolution 24,34]\\n52. inactive_disinterested(X0) | attend_engaged(X0) [resolution 19,18]\\n53. attend_engaged(bonnie) [resolution 52,33]\\n55. $false [forward subsumption resolution 53,51]\\n% SZS output end Proof for club_problem_pos\\n% Termination reason: Refutation","stderr":null,"returncode":0},"negative":{"status":"success","szs_status":"CounterSatisfiable","stdout":"% SZS status CounterSatisfiable for club_problem_neg\\n% SZS output start Saturation.\\ncnf(u35,negated_conjecture,\\n    student(bonnie)).\\n\\ncnf(u39,negated_conjecture,\\n    further(bonnie)).\\n\\ncnf(u42,negated_conjecture,\\n    ~young_teen(bonnie)).\\n\\ncnf(u48,negated_conjecture,\\n    ~chaperone(bonnie)).\\n\\ncnf(u52,axiom,\\n    attend_engaged(bonnie)).\\n\\ncnf(u20,axiom,\\n    ~inactive_disinterested(X0) | chaperone(X0)).\\n\\ncnf(u60,axiom,\\n    chaperone(X0) | attend_engaged(X0)).\\n\\ncnf(u17,axiom,\\n    ~perform(X0) | attend_engaged(X0)).\\n\\ncnf(u16,axiom,\\n    bonnie != other).\\n\\ncnf(u19,axiom,\\n    ~student(X0) | ~chaperone(X0)).\\n\\ncnf(u56,axiom,\\n    inactive_disinterested(X0) | attend_engaged(X0)).\\n\\ncnf(u18,axiom,\\n    perform(X0) | inactive_disinterested(X0)).\\n\\ncnf(u21,axiom,\\n    ~further(X0) | ~young_teen(X0) | student(X0)).\\n\\n% SZS output end Saturation.\\n% SZS output start Definitions and Model Updates.\\n% SZS output end Definitions and Model Updates.\\n% Termination reason: Satisfiable","stderr":null,"returncode":0}}', 'id': 'lc_2d2bfc49-4fc6-4fa4-80d0-bb2de8ad9fbc'}]
+```

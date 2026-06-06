@@ -1,0 +1,1996 @@
+# Benchmark Report (SYSTEM1): ASPBench - 11_tournament_ranking_hard
+
+**Provider:** mistral
+**Model:** mistral-small-2603
+**Config:** max_output_tokens: 32768, temperature: 0.0, top_p: 1.0, seed: 42, reasoning_enabled: True, reasoning_effort: high
+**Duration:** 166.07s
+
+
+ SYSTEM 1 PURE REASONING AGENT
+
+ Query: # Problem Statement
+
+Find a valid ranking for 30 teams in a weighted round-robin tournament with complex constraints. Each match has a positive integer weight. A violation occurs when a lower-ranked team beat a higher-ranked team. The task is to find a ranking that satisfies all hard constraints while keeping the total weighted violations within an acceptable bound.
+
+## Instance Data
+
+**Teams:** T01, T02, ..., T30
+
+**Seeds (special teams):** T01, T02, T03, T04, T05, T06, T07, T08, T09, T10
+
+**Groups:**
+- Group A: T01-T05
+- Group B: T06-T10
+- Group C: T11-T15
+- Group D: T16-T20
+- Group E: T21-T25
+- Group F: T26-T30
+
+**Match Results:** Generated using the following pattern:
+```python
+import random
+random.seed(42)
+for i in range(30):
+    for j in range(i+1, 30):
+        weight = random.randint(1, 5)
+        if (i+j) % 2 == 0:
+            teams[i] beats teams[j] with weight
+        else:
+            teams[j] beats teams[i] with weight
+```
+
+## Constraints
+
+1. **Must-above** constraints (20 pairs): T05 must rank above T18, T10 above T11, T07 above T28, T08 above T19, T02 above T27, T04 above T21, T03 above T12, T06 above T17, T09 above T25, T01 above T30, T13 above T29, T14 above T20, T15 above T16, T22 above T08, T23 above T03, T24 above T07, T26 above T05, T25 above T14, T20 above T22, T28 above T15
+
+2. **Adjacency bans** (15 pairs): The following teams cannot be adjacent in ranking: (T02,T03), (T04,T05), (T06,T07), (T08,T09), (T10,T11), (T12,T13), (T14,T15), (T16,T17), (T18,T19), (T20,T21), (T22,T23), (T24,T25), (T26,T27), (T28,T29), (T01,T30)
+
+3. **Forbid-top** constraints (8 teams): T27 cannot be in top 3, T14 in top 5, T18 in top 4, T21 in top 2, T22 in top 6, T19 in top 8, T16 in top 7, T29 in top 10
+
+4. **Forbid-block** constraints (5 teams): T14 cannot be in positions 11-15, T20 in positions 5-9, T23 in positions 13-17, T02 in positions 21-25, T09 in positions 26-30
+
+5. **Diversity** constraint: In any consecutive window of 5 teams, no more than 2 teams from the same group
+
+6. **Seed quota**: At least 6 seed teams (T01-T10) must be in the top 10 positions
+
+7. **Violation bound**: Total weighted violations must be ≤ 650, where a violation occurs when a lower-ranked team beat a higher-ranked team
+
+## Objective
+
+Find **any** valid ranking that satisfies all 7 constraints above. This is a **satisfaction problem**, not an optimization problem. The goal is to find a feasible ranking that meets the violation bound, not to find the ranking with the absolute minimum violations. Your solution will be considered correct if it respects all hard constraints (must-above, adjacency bans, forbid-top, forbid-block, diversity, seed quota) AND has total weighted violations ≤ 650.
+
+## Output Format
+
+```json
+{
+  "ranking": ["T01", "T02", ..., "T30"],
+  "violations": 42,
+  "valid": true,
+  "total_abs_deviation": 15
+}
+```
+
+### Field Descriptions
+
+- **ranking**: List of 30 team IDs in order from rank 1 to rank 30
+- **violations**: Total sum of weights for all violations in this ranking
+- **valid**: Boolean indicating whether all hard constraints are satisfied
+- **total_abs_deviation**: Sum of absolute differences between each team's rank and its expected position (T01 expected at position 1, T02 at position 2, etc.)
+
+
+Return your final answer in JSON format.
+
+
+### Thinking
+
+- Okay, let's try to tackle this problem step by step. It's a complex ranking problem with multiple constraints, so I need to approach it methodically.
+- First, let's recap all the constraints to make sure I understand them correctly:
+- 1. **Must-above constraints (20 pairs)**: These are hard constraints where certain teams must be ranked higher than others. For example, T05 must be above T18, T10 above T11, etc. So in the final ranking, T05 should come before T18, and so on for all 20 pairs.
+- 2. **Adjacency bans (15 pairs)**: These pairs cannot be next to each other in the ranking. So if T02 is ranked at position 5, T03 can't be at 4 or 6.
+- 3. **Forbid-top constraints (8 teams)**: These teams can't be in certain top positions. For example, T27 can't be in the top 3, T14 not in top 5, etc.
+- 4. **Forbid-block constraints (5 teams)**: These teams can't be in specific position ranges. Like T14 can't be in 11-15, T20 not in 5-9, etc.
+- 5. **Diversity constraint**: In any 5 consecutive teams, no more than 2 from the same group (A-F, each group has 5 teams).
+- 6. **Seed quota**: At least 6 of the top 10 teams must be seeds (T01-T10).
+- 7. **Violation bound**: Total weighted violations (when a lower-ranked team beat a higher-ranked team) must be ≤650.
+- The goal is to find any ranking that satisfies all hard constraints (1-6) and has violations ≤650.
+- First, I need to generate the match results based on the given Python code to know which teams beat which and with what weights. Wait, the problem says the match results are generated using that code, but since I don't have the actual data, I need to simulate it. Wait, but the user provided the code, so maybe I can generate the results here.
+- Wait, the problem says "Match Results: Generated using the following pattern" with that Python code. So to compute the violations, I need to know for each pair (i,j) where i < j, whether teams[i] beats teams[j] or vice versa, and the weight.
+- But since the code uses random.seed(42), the results are deterministic. So I can simulate the match results here.
+- Let me try to generate the match results.
+- First, teams are T01 to T30, which correspond to indices 0 to 29 (since in Python, lists are 0-based). So team T01 is index 0, T02 index 1, ..., T30 index 29.
+- The code loops for i in 0..29, j in i+1..29.
+- For each (i,j), weight = random.randint(1,5).
+- If (i + j) % 2 == 0, then teams[i] beats teams[j] with that weight.
+- Else, teams[j] beats teams[i] with that weight.
+- So for each pair (i,j), i < j:
+- - Compute (i + j) % 2.
+- - If even, then team i beats team j with weight w.
+- - If odd, team j beats team i with weight w.
+- So the direction depends on whether i+j is even or odd.
+- Let me compute for a few examples:
+- Take i=0 (T01), j=1 (T02):
+- i+j = 0+1=1, which is odd. So teams[j] (T02) beats teams[i] (T01) with weight w.
+- Wait, the code says:
+- if (i+j) % 2 == 0:
+- teams[i] beats teams[j] with weight
+- else:
+- teams[j] beats teams[i] with weight
+- So for i=0, j=1: 0+1=1, odd → teams[j] (T02) beats teams[i] (T01) with weight.
+- Similarly, i=0, j=2: 0+2=2 even → teams[0] (T01) beats teams[2] (T03) with weight.
+- Wait, but the problem says "teams[i] beats teams[j] with weight" when (i+j) even.
+- So for each pair (i,j), i < j:
+- - If (i + j) is even → i beats j, weight w.
+- - If (i + j) is odd → j beats i, weight w.
+- So the winner is determined by the parity of i + j.
+- Given that, let's note that:
+- For i and j, if i and j are both even or both odd, their sum is even → i beats j.
+- If one is even and the other odd, sum is odd → j beats i.
+- Wait, i and j are indices (0-based). So for example:
+- i=0 (even), j=1 (odd): sum 1 (odd) → j beats i.
+- i=0 (even), j=2 (even): sum 2 (even) → i beats j.
+- i=1 (odd), j=2 (even): sum 3 (odd) → j beats i.
+- So the direction alternates based on parity.
+- But the weight is random.randint(1,5), but since seed is 42, the weights are fixed.
+- Wait, but the problem says "Match Results: Generated using the following pattern" with that code. So the actual weights depend on the random seed. Since the seed is 42, the weights are deterministic.
+- But to compute the violations, I need to know for each pair which team won and with what weight.
+- But since I can't run Python here, I need to simulate the weights based on seed 42.
+- Wait, but the problem says "the match results are generated using the following pattern", so perhaps the exact weights are not critical as long as we can compute the violations once the ranking is determined. However, for the purpose of solving the problem, I need to know for a given ranking, which pairs are violations and sum their weights.
+- But since the user hasn't provided the actual match results, but the code to generate them, I need to generate the match results here.
+- Alternatively, maybe the problem expects me to assume that the match results are as per the code with seed 42, and thus the violations can be computed once the ranking is proposed.
+- But since I need to find a ranking that satisfies the violation bound, I need to know the total violations for a candidate ranking.
+- But without knowing the exact match results, it's impossible to compute the exact violations. Wait, but the problem says "the match results are generated using the following pattern", so perhaps the actual weights are not important as long as we can compute them. However, for the purpose of this problem, since it's a thought process, I need to proceed under the assumption that I can generate the match results.
+- Wait, but the user is asking me to solve the problem, which requires knowing the match results to compute violations. Since the code is given with seed 42, I need to generate the match results.
+- Let me try to generate the match results.
+- First, for each pair (i,j) where i < j (0-based indices), compute whether i beats j or j beats i, and the weight.
+- The weight is random.randint(1,5) with seed 42. So for each (i,j), the weight is determined by the seed.
+- But since the code loops i from 0 to 29, and for each i, j from i+1 to 29, the order of generating weights is deterministic.
+- So for example, the first weight (i=0, j=1) is random.randint(1,5) with seed 42. Let's see what that would be.
+- In Python:
+- import random random.seed(42) print(random.randint(1,5))  # This would be the first weight for (0,1)
+- But since I can't run it here, I need to recall or estimate. Wait, perhaps I can look up what random.randint(1,5) with seed 42 gives.
+- Alternatively, perhaps the exact weights aren't necessary for the thought process, but the direction (who beats whom) is determined by (i+j) % 2, and the weight is a random number between 1-5, but since seed is fixed, the weights are fixed.
+- But for the purpose of solving the problem, the key is that for any pair (A,B), we can determine if A beat B and with what weight, based on their indices.
+- Wait, the teams are T01 to T30, which correspond to indices 0 to 29.
+- So for team X = T(k), its index is k-1.
+- For example, T01 is index 0, T02 index 1, ..., T30 index 29.
+- So when comparing two teams, say T05 (index 4) and T18 (index 17):
+- i=4, j=17.
+- i + j = 21, which is odd → so teams[j] (T18) beats teams[i] (T05) with weight w.
+- Wait, but the must-above constraint says T05 must rank above T18. So in the ranking, T05 comes before T18. But according to the match result, T18 beat T05 (since i+j=21 is odd → j beats i). So this would be a violation, with weight w.
+- So the violation weight is the weight of the match where the lower-ranked team (T18 is lower-ranked if it's after T05) beat the higher-ranked team (T05).
+- Wait, in the ranking, if T05 is ranked higher (earlier in the list) than T18, then if T18 beat T05, that's a violation, and the weight is added to the total.
+- So for each pair where in the ranking, team A is ranked higher than team B, but B beat A, then the weight of that match is added to the violations.
+- Therefore, to compute violations for a candidate ranking, for every pair (A,B) where A is ranked higher than B, check if B beat A (i.e., in the match results, B has a win over A), and sum those weights.
+- So the first step is to generate all the match results (who beat whom and with what weight).
+- Given that, let's try to generate the match results.
+- But since I can't run Python here, perhaps I can find a way to approximate or find a pattern.
+- Alternatively, perhaps the problem expects me to proceed without the exact weights, but that's not possible because the violation count depends on them.
+- Wait, but the problem says "the match results are generated using the following pattern", so perhaps the exact weights are not as important as the direction (who beat whom), but the weights are positive integers between 1-5, so the total violations could be up to (30*29/2)*5 = 2175, but we need it ≤650.
+- But given that, perhaps the key is to arrange the ranking such that most of the higher-ranked teams beat the lower-ranked ones, minimizing the violations.
+- But given the must-above constraints, some violations are unavoidable. For example, if T05 must be above T18, but T18 beat T05, that's a violation with weight w.
+- So the first thing is to list all the must-above constraints and see which ones would result in violations based on the match results.
+- But without knowing who beat whom, it's hard to say. However, given the code, we can determine for each must-above pair whether the higher-ranked team (as per must-above) actually won or lost.
+- Wait, the must-above constraints specify that team X must be ranked above team Y. So in the ranking, X comes before Y. If in reality Y beat X, then that's a violation with weight equal to the match weight.
+- So for each must-above pair (X must be above Y), we need to check if Y beat X. If yes, then that contributes to the violation count.
+- Similarly, for other pairs not in must-above, if a lower-ranked team beat a higher-ranked team, it's also a violation.
+- So the total violations are the sum over all pairs where the lower-ranked team beat the higher-ranked team of the match weight.
+- Given that, the problem requires that this sum ≤650.
+- Now, the challenge is to find a ranking that satisfies all the hard constraints (must-above, adjacency bans, etc.) and has total violations ≤650.
+- Given the complexity, perhaps the best approach is to first handle the hard constraints, then check the violations.
+- Let's list all the constraints again:
+- **Must-above (20 pairs):**
+- 1. T05 > T18
+- 2. T10 > T11
+- 3. T07 > T28
+- 4. T08 > T19
+- 5. T02 > T27
+- 6. T04 > T21
+- 7. T03 > T12
+- 8. T06 > T17
+- 9. T09 > T25
+- 10. T01 > T30
+- 11. T13 > T29
+- 12. T14 > T20
+- 13. T15 > T16
+- 14. T22 > T08
+- 15. T23 > T03
+- 16. T24 > T07
+- 17. T26 > T05
+- 18. T25 > T14
+- 19. T20 > T22
+- 20. T28 > T15
+- **Adjacency bans (15 pairs):**
+- (T02,T03), (T04,T05), (T06,T07), (T08,T09), (T10,T11), (T12,T13), (T14,T15), (T16,T17), (T18,T19), (T20,T21), (T22,T23), (T24,T25), (T26,T27), (T28,T29), (T01,T30)
+- **Forbid-top (8 teams):**
+- - T27: not in top 3
+- - T14: not in top 5
+- - T18: not in top 4
+- - T21: not in top 2
+- - T22: not in top 6
+- - T19: not in top 8
+- - T16: not in top 7
+- - T29: not in top 10
+- **Forbid-block (5 teams):**
+- - T14: not in 11-15
+- - T20: not in 5-9
+- - T23: not in 13-17
+- - T02: not in 21-25
+- - T09: not in 26-30
+- **Diversity:** Any 5 consecutive teams have ≤2 from same group.
+- Groups:
+- A: T01-T05 (indices 0-4)
+- B: T06-T10 (5-9)
+- C: T11-T15 (10-14)
+- D: T16-T20 (15-19)
+- E: T21-T25 (20-24)
+- F: T26-T30 (25-29)
+- **Seed quota:** At least 6 seeds (T01-T10) in top 10.
+- **Violation bound:** ≤650.
+- Now, to construct a ranking that satisfies all these.
+- First, let's handle the must-above constraints. These form a directed graph where an edge X→Y means X must be above Y. We need a topological sort of this graph, but with additional constraints.
+- Let's list all the must-above edges:
+- 1. T05 → T18
+- 2. T10 → T11
+- 3. T07 → T28
+- 4. T08 → T19
+- 5. T02 → T27
+- 6. T04 → T21
+- 7. T03 → T12
+- 8. T06 → T17
+- 9. T09 → T25
+- 10. T01 → T30
+- 11. T13 → T29
+- 12. T14 → T20
+- 13. T15 → T16
+- 14. T22 → T08
+- 15. T23 → T03
+- 16. T24 → T07
+- 17. T26 → T05
+- 18. T25 → T14
+- 19. T20 → T22
+- 20. T28 → T15
+- Let's try to find dependencies.
+- For example:
+- T23 → T03 (15)
+- T03 → T12 (7)
+- T07 → T28 (3)
+- T28 → T15 (20)
+- T15 → T16 (13)
+- T14 → T20 (12)
+- T20 → T22 (19)
+- T22 → T08 (14)
+- T08 → T19 (4)
+- T24 → T07 (16)
+- T07 → T28 (3)
+- T26 → T05 (17)
+- T05 → T18 (1)
+- T04 → T21 (6)
+- T21 is a seed (T21 is in B group? Wait, groups:
+- Group A: T01-T05 (seeds 1-5)
+- Group B: T06-T10 (seeds 6-10)
+- Group C: T11-T15
+- Group D: T16-T20
+- Group E: T21-T25
+- Group F: T26-T30
+- So T21 is in group E (E: T21-T25).
+- T09 → T25 (9)
+- T25 → T14 (18)
+- T14 → T20 (12)
+- T13 → T29 (11)
+- T01 → T30 (10)
+- T02 → T27 (5)
+- T06 → T17 (8)
+- T10 → T11 (2)
+- T17 is in group D (D: T16-T20), T11 in group C.
+- This is getting complex. Maybe we can model this as a directed graph and find a topological order, but with the other constraints.
+- But topological sort may not be unique, and we have to satisfy other constraints like adjacency bans, forbid-top, etc.
+- Alternatively, perhaps we can start by placing the seeds in the top positions, considering the seed quota (at least 6 seeds in top 10).
+- Seeds are T01-T10.
+- Forbid-top constraints for seeds:
+- - T21 (not seed) has forbid-top: not in top 2.
+- Wait, forbid-top constraints are for specific teams, regardless of being seeds.
+- For example, T27 (non-seed) cannot be in top 3.
+- T14 (non-seed) not in top 5.
+- T18 (non-seed) not in top 4.
+- T21 (non-seed) not in top 2.
+- T22 (non-seed) not in top 6.
+- T19 (non-seed) not in top 8.
+- T16 (non-seed) not in top 7.
+- T29 (non-seed) not in top 10.
+- So seeds T01-T10 can be in top positions unless restricted by other constraints.
+- But T21 is a non-seed (group E), so it's allowed in top positions except top 2.
+- Wait, forbid-top constraints are per team, not per seed status.
+- So for example, T21 (which is in group E, index 20) cannot be in top 2 positions.
+- Similarly, T16 (group D, index 15) cannot be in top 7.
+- So when constructing the top positions, we need to avoid placing these teams there.
+- Also, forbid-block constraints:
+- T14 cannot be in 11-15.
+- T20 cannot be in 5-9.
+- T23 cannot be in 13-17.
+- T02 cannot be in 21-25.
+- T09 cannot be in 26-30.
+- So T02 (a seed) must be in positions 1-20, but not 21-25. Wait, forbid-block says T02 cannot be in 21-25, so T02 must be in 1-20.
+- Similarly, T09 (seed) cannot be in 26-30, so must be in 1-25.
+- But seed quota requires at least 6 seeds in top 10.
+- Let's try to construct the top 10 first.
+- Top 10 positions (1-10):
+- Must have ≥6 seeds (T01-T10).
+- Also, forbid-top constraints:
+- - T27 not in top 3
+- - T14 not in top 5
+- - T18 not in top 4
+- - T21 not in top 2
+- - T22 not in top 6
+- - T19 not in top 8
+- - T16 not in top 7
+- - T29 not in top 10
+- So in top 10, we cannot have T14, T16, T18, T19, T21, T22, T27, T29.
+- Wait, T29 is forbidden in top 10, so top 10 can only include teams except those 8.
+- But seeds T01-T10: T21 is not a seed (seeds are T01-T10), so T21 is group E (T21-T25), so T21 is non-seed.
+- Similarly, T14 is group C (T11-T15), non-seed.
+- So the forbidden teams in top 10 are non-seeds: T14, T16, T18, T19, T21, T22, T27, T29.
+- Therefore, top 10 must consist of seeds (T01-T10) and possibly other teams not in the forbidden list.
+- Wait, but seeds are T01-T10, so the only teams that can be in top 10 are seeds and non-seeds not forbidden.
+- But the forbidden list for top 10 includes T14, T16, T18, T19, T21, T22, T27, T29.
+- So possible teams for top 10:
+- Seeds: T01-T10 (10 teams)
+- Non-seeds not forbidden: T11-T13, T15, T17, T20, T23-T26, T28, T30.
+- Wait:
+- Group C: T11-T15 → T11, T12, T13, T14, T15. Forbidden in top 10: T14. So T11, T12, T13, T15 are allowed.
+- Group D: T16-T20 → T16, T17, T18, T19, T20. Forbidden: T16, T18, T19. So T17, T20 allowed.
+- Group E: T21-T25 → T21, T22, T23, T24, T25. Forbidden: T21, T22. So T23, T24, T25 allowed.
+- Group F: T26-T30 → T26, T27, T28, T29, T30. Forbidden: T27, T29. So T26, T28, T30 allowed.
+- So non-seeds allowed in top 10: T11, T12, T13, T15, T17, T20, T23, T24, T25, T26, T28, T30.
+- But seed quota requires at least 6 seeds in top 10. Since there are 10 seeds, we can include up to 10 seeds in top 10, but need at least 6.
+- But some seeds may have other constraints.
+- For example, T10 is a seed. Are there any constraints on T10?
+- Looking at must-above: T10 must be above T11 (constraint 2). So T10 > T11.
+- Also, adjacency ban: (T10,T11) cannot be adjacent. So if T10 is in position x, T11 cannot be in x-1 or x+1.
+- Forbid-top: none specified for T10.
+- Forbid-block: none.
+- So T10 can be in top 10.
+- Similarly, T01 has must-above T01 > T30 (constraint 10), adjacency ban (T01,T30), forbid-top none, forbid-block none.
+- So possible to have seeds in top 10.
+- Let's try to place seeds in top 10.
+- We need at least 6 seeds. Let's aim for 8 seeds in top 10 to be safe.
+- Possible seeds: T01-T10.
+- But need to consider must-above constraints that involve seeds.
+- For example:
+- T01 must be above T30 (constraint 10). So T01 > T30.
+- T02 must be above T27 (constraint 5).
+- T03 must be above T12 (constraint 7).
+- T04 must be above T21 (constraint 6).
+- T05 must be above T18 (constraint 1).
+- T06 must be above T17 (constraint 8).
+- T07 must be above T28 (constraint 3).
+- T08 must be above T19 (constraint 4).
+- T09 must be above T25 (constraint 9).
+- T10 must be above T11 (constraint 2).
+- Also, other must-above constraints involving non-seeds:
+- T13 > T29 (11)
+- T14 > T20 (12)
+- T15 > T16 (13)
+- T22 > T08 (14)
+- T23 > T03 (15)
+- T24 > T07 (16)
+- T26 > T05 (17)
+- T25 > T14 (18)
+- T20 > T22 (19)
+- T28 > T15 (20)
+- This is quite interconnected.
+- Perhaps a good strategy is to start with the seeds in the top positions, respecting the must-above constraints among seeds.
+- For example, T10 must be above T11, so T10 should be ranked higher than T11.
+- Similarly, T03 must be above T12, so T03 > T12.
+- T04 > T21 (but T21 is non-seed, group E).
+- T05 > T18 (T18 is group D).
+- T06 > T17 (T17 is group D).
+- T07 > T28 (T28 is group F).
+- T08 > T19 (T19 is group D).
+- T09 > T25 (T25 is group E).
+- T01 > T30 (T30 is group F).
+- Also, T23 > T03 (constraint 15), so T23 must be above T03.
+- T24 > T07 (16), so T24 > T07.
+- T26 > T05 (17), so T26 > T05.
+- T22 > T08 (14), so T22 > T08.
+- T20 > T22 (19), so T20 > T22.
+- T25 > T14 (18), so T25 > T14.
+- T14 > T20 (12), so T14 > T20.
+- Wait, constraint 12: T14 > T20
+- Constraint 18: T25 > T14
+- Constraint 19: T20 > T22
+- Constraint 14: T22 > T08
+- Constraint 4: T08 > T19
+- So combining these:
+- T25 > T14 > T20 > T22 > T08 > T19
+- Similarly, constraint 15: T23 > T03
+- Constraint 7: T03 > T12
+- So T23 > T03 > T12
+- Constraint 16: T24 > T07
+- Constraint 3: T07 > T28
+- So T24 > T07 > T28
+- Constraint 17: T26 > T05
+- Constraint 1: T05 > T18
+- So T26 > T05 > T18
+- Constraint 5: T02 > T27
+- Constraint 9: T09 > T25
+- Constraint 18: T25 > T14
+- So T09 > T25 > T14
+- Constraint 11: T13 > T29
+- Constraint 10: T01 > T30
+- Constraint 2: T10 > T11
+- Constraint 6: T04 > T21
+- Constraint 8: T06 > T17
+- Constraint 13: T15 > T16
+- Constraint 20: T28 > T15
+- So T28 > T15 > T16
+- Putting this all together, we can see chains:
+- From T25 > T14 > T20 > T22 > T08 > T19
+- And T09 > T25, so T09 > T25 > T14 > T20 > T22 > T08 > T19
+- From T23 > T03 > T12
+- From T24 > T07 > T28 > T15 > T16
+- From T26 > T05 > T18
+- From T02 > T27
+- From T01 > T30
+- From T10 > T11
+- From T04 > T21
+- From T06 > T17
+- Also, T13 > T29
+- Now, let's try to build a partial order.
+- Let's consider the longest chain:
+- T09 > T25 > T14 > T20 > T22 > T08 > T19
+- That's 7 teams.
+- Another chain: T23 > T03 > T12 (3 teams)
+- T24 > T07 > T28 > T15 > T16 (5 teams)
+- T26 > T05 > T18 (3 teams)
+- T02 > T27 (2 teams)
+- T01 > T30 (2 teams)
+- T10 > T11 (2 teams)
+- T04 > T21 (2 teams)
+- T06 > T17 (2 teams)
+- T13 > T29 (2 teams)
+- Now, to create a ranking, we need to interleave these chains while respecting the order within each chain.
+- Also, we have to consider the seed quota: at least 6 seeds in top 10.
+- Seeds are T01-T10.
+- In the chains above, the seeds involved are:
+- T09 (seed), T08 (seed), T02 (seed), T01 (seed), T10 (seed), T04 (seed), T06 (seed).
+- T03 is a seed (T03 is in group A, seeds 1-5), T05, T07 are seeds.
+- So seeds in the chains:
+- T01, T02, T03, T04, T05, T06, T07, T08, T09, T10.
+- All seeds are in the chains.
+- Now, to maximize the number of seeds in the top 10, we should place as many seeds as possible early.
+- Let's try to construct the top part.
+- First, the forbid-top constraints for top positions:
+- - Position 1-2: cannot have T21 (so seeds are okay here)
+- - Position 3: cannot have T27
+- - Position 4: cannot have T18
+- - Position 5: cannot have T14
+- - Position 6: cannot have T22
+- - Position 7: cannot have T16
+- - Position 8: cannot have T19
+- - Position 10: cannot have T29
+- So in top 10, the forbidden teams are T14 (pos5), T16 (pos7), T18 (pos4), T19 (pos8), T21 (pos1-2), T22 (pos6), T27 (pos3), T29 (pos10).
+- Therefore, top 10 can include seeds and other allowed teams.
+- Let's try to place seeds in top 10.
+- Possible seeds to place: T01, T02, T03, T04, T05, T06, T07, T08, T09, T10.
+- But need to respect must-above constraints among seeds.
+- For example, T10 must be above T11 (but T11 is non-seed, so as long as T10 is placed before T11, it's okay).
+- Similarly, T03 must be above T12 (non-seed).
+- So seeds can be placed freely among themselves as long as their must-above constraints with other seeds are respected.
+- Wait, are there any must-above constraints between seeds?
+- Looking at the must-above list:
+- Constraint 14: T22 > T08 (T22 is non-seed, T08 is seed)
+- Constraint 15: T23 > T03 (T23 non-seed, T03 seed)
+- Constraint 16: T24 > T07 (T24 non-seed, T07 seed)
+- Constraint 17: T26 > T05 (T26 non-seed, T05 seed)
+- Constraint 19: T20 > T22 (both non-seeds)
+- So among seeds themselves, the only must-above constraints are:
+- T10 > T11 (T11 non-seed)
+- T08 > T19 (T19 non-seed)
+- T07 > T28 (T28 non-seed)
+- Etc. So no direct must-above between seeds, except possibly through other constraints.
+- Wait, constraint 14: T22 > T08, and constraint 19: T20 > T22, so T20 > T22 > T08. But T20 and T22 are non-seeds.
+- Similarly, constraint 15: T23 > T03, so T23 (non-seed) must be above T03 (seed).
+- Ah, this is important. So T23 must be ranked higher than T03.
+- Similarly, T24 must be higher than T07.
+- T26 must be higher than T05.
+- T22 must be higher than T08.
+- So seeds like T03, T05, T07, T08 have non-seed teams that must be above them.
+- This complicates things because some seeds cannot be too high in the ranking if their "must-be-above" non-seed teams are placed higher.
+- For example, T03 must be below T23.
+- So if we want T03 in the top 10, T23 must also be in the top 10 and ranked higher than T03.
+- Similarly, T05 must be below T26.
+- T07 below T24.
+- T08 below T22.
+- So to have seeds like T03, T05, T07, T08 in the top 10, we need to also include T23, T26, T24, T22 in the top 10 and place them above the respective seeds.
+- This may limit how many seeds we can have in the top 10.
+- Let's analyze each seed:
+- - T01: must be above T30 (non-seed). No other constraints forcing a non-seed above T01. So T01 can potentially be in top position.
+- - T02: must be above T27 (non-seed). So T27 must be below T02. No non-seed forced above T02.
+- - T03: must be below T23 (non-seed). So T23 > T03.
+- - T04: must be above T21 (non-seed). So T04 > T21. No non-seed forced above T04.
+- - T05: must be below T26 (non-seed). So T26 > T05.
+- - T06: must be above T17 (non-seed). So T06 > T17. No non-seed forced above T06.
+- - T07: must be below T24 (non-seed). So T24 > T07.
+- - T08: must be below T22 (non-seed). So T22 > T08.
+- - T09: must be above T25 (non-seed). So T09 > T25. No non-seed forced above T09.
+- - T10: must be above T11 (non-seed). So T10 > T11. No non-seed forced above T10.
+- So for seeds T03, T05, T07, T08, to have them in the top 10, we need to also include T23, T26, T24, T22 in the top 10 and place them above the respective seeds.
+- This could take up slots in the top 10.
+- For example, if we want T03 in top 10, we need T23 also in top 10 and ranked higher.
+- Similarly for others.
+- Let's estimate how many seeds we can fit in top 10.
+- Suppose we try to include as many seeds as possible.
+- Option 1: Include seeds T01, T02, T04, T06, T09, T10 (6 seeds), which meets the quota.
+- But we can try for more.
+- But need to check if their required non-seeds can fit.
+- For example:
+- - T01: no issue.
+- - T02: no issue.
+- - T04: no issue.
+- - T06: no issue.
+- - T09: no issue.
+- - T10: no issue.
+- That's 6 seeds. To get more, we need to include T03, but then need T23 above it.
+- Similarly for T05 (needs T26 above), T07 (T24 above), T08 (T22 above).
+- Let's see:
+- If we include T03, we need T23 in top 10 and above T03.
+- Similarly, T05 needs T26 above.
+- T07 needs T24 above.
+- T08 needs T22 above.
+- So each of these seeds requires an additional non-seed in the top 10.
+- So for each such seed, we use two slots (the seed and the non-seed above it).
+- For example, to have T03 in top 10, we need positions for T23 and T03.
+- Similarly for others.
+- Let's count:
+- - T03 and T23: 2 slots
+- - T05 and T26: 2 slots
+- - T07 and T24: 2 slots
+- - T08 and T22: 2 slots
+- That's 8 slots for 4 seeds and 4 non-seeds.
+- Plus the 6 seeds that don't require non-seeds above them: T01, T02, T04, T06, T09, T10 → 6 slots.
+- Total slots needed: 8 + 6 = 14, but top 10 only has 10 slots. So impossible to include all.
+- Therefore, we need to choose which seeds to include in top 10, considering the required non-seeds.
+- Perhaps it's better to prioritize seeds that don't require additional non-seeds in the top 10.
+- Seeds that don't have a non-seed that must be above them: T01, T02, T04, T06, T09, T10.
+- These 6 seeds can be placed in top 10 without needing extra slots for non-seeds above them.
+- The other seeds (T03, T05, T07, T08) require non-seeds (T23, T26, T24, T22) to be above them, which would take extra slots.
+- So to meet the seed quota of 6, we can place T01, T02, T04, T06, T09, T10 in top 10.
+- Let's try that.
+- Top 10 candidates:
+- Seeds: T01, T02, T04, T06, T09, T10
+- Non-seeds allowed in top 10: T11, T12, T13, T15, T17, T20, T23, T24, T25, T26, T28, T30.
+- But need to respect must-above constraints.
+- For example, T10 must be above T11 (constraint 2). So if T11 is in top 10, T10 must be ranked higher.
+- Similarly, T09 must be above T25 (constraint 9), so if T25 is in top 10, T09 must be higher.
+- T06 must be above T17 (constraint 8), so T17 in top 10 requires T06 higher.
+- T04 must be above T21 (constraint 6), but T21 is forbidden in top 2, but T21 is non-seed, group E.
+- T02 must be above T27 (constraint 5), T27 forbidden in top 3.
+- T01 must be above T30 (constraint 10), T30 forbidden in top 10.
+- So if we include non-seeds in top 10, we have to place the corresponding seed above them.
+- But since we're trying to maximize seeds in top 10, perhaps it's better to exclude non-seeds from top 10 and include more seeds.
+- Wait, there are 10 seeds. If we can include all 10 seeds in top 10, that would satisfy the seed quota (10 ≥6).
+- But are there any constraints preventing all seeds from being in top 10?
+- Let's check:
+- - T03: must be below T23. So if T23 is not in top 10, then T03 cannot be in top 10 either, because T23 would have to be ranked above T03, but if T23 is outside top 10, then T03 would have to be below T23, hence outside top 10.
+- Wait, no. The must-above constraint is T23 > T03, meaning T23 must be ranked higher than T03. So if T03 is in position 5, T23 must be in 1-4.
+- Therefore, to have T03 in top 10, T23 must also be in top 10 and ranked higher.
+- Similarly for T05 (needs T26 above), T07 (T24 above), T08 (T22 above).
+- So to have all 10 seeds in top 10, we need to also include T22, T23, T24, T26 in top 10, which would require 14 teams in top 10, which is impossible.
+- Therefore, it's not possible to have all 10 seeds in top 10.
+- The maximum number of seeds we can have in top 10 depends on how many of the "required above" non-seeds we can fit.
+- Let's try to include as many seeds as possible.
+- Option: Include seeds T01, T02, T04, T06, T09, T10 (6 seeds), and also T03, T05, T07, T08, but each requires a non-seed above them.
+- But top 10 has 10 slots.
+- Suppose we do:
+- Slots 1-10:
+- We need to place:
+- - For T03: T23 and T03
+- - For T05: T26 and T05
+- - For T07: T24 and T07
+- - For T08: T22 and T08
+- - Plus seeds T01, T02, T04, T06, T09, T10
+- That's 2*4 + 6 = 14 teams, which is more than 10. Not feasible.
+- Alternative approach: Choose which seeds to include such that their required non-seeds can fit.
+- For example, if we exclude T03, T05, T07, T08 from top 10, then we can have 6 seeds (T01, T02, T04, T06, T09, T10) in top 10.
+- But seed quota is 6, so that's acceptable.
+- Alternatively, include some of them with their required non-seeds.
+- For example:
+- Include T03 and T23 (2 slots)
+- Include T05 and T26 (2 slots)
+- Include T09 and T10 (2 seeds)
+- Include T01, T02, T04, T06 (4 seeds)
+- Total: 2+2+2+4=10 slots.
+- Let's see:
+- Slots 1-10:
+- 1. T23 (non-seed)
+- 2. T03 (seed)
+- 3. T26 (non-seed)
+- 4. T05 (seed)
+- 5. T09 (seed)
+- 6. T10 (seed)
+- 7. T01 (seed)
+- 8. T02 (seed)
+- 9. T04 (seed)
+- 10. T06 (seed)
+- This gives 6 seeds in top 10 (T03, T05, T09, T10, T01, T02, T04, T06 → wait, that's 8 seeds).
+- Wait:
+- T23 (non-seed)
+- T03 (seed)
+- T26 (non-seed)
+- T05 (seed)
+- T09 (seed)
+- T10 (seed)
+- T01 (seed)
+- T02 (seed)
+- T04 (seed)
+- T06 (seed)
+- That's 8 seeds in top 10 (positions 2,4,5,6,7,8,9,10), which meets the quota of 6.
+- Good.
+- Now, check forbid-top constraints for these positions:
+- Position 1: T23. Is T23 forbidden in top 10? Forbid-top constraints are for specific teams:
+- T27 not in top3, T14 not in top5, T18 not in top4, T21 not in top2, T22 not in top6, T19 not in top8, T16 not in top7, T29 not in top10.
+- T23 is not in the forbidden list for top positions, so it's allowed in position 1.
+- Position 2: T03 (seed), allowed.
+- Position 3: T26 (non-seed), allowed (forbidden teams in top3 are T27).
+- Position 4: T05 (seed), allowed (forbidden in top4 is T18).
+- Position 5: T09 (seed), allowed (forbidden in top5 is T14).
+- Position 6: T10 (seed), allowed (forbidden in top6 is T22).
+- Position 7: T01 (seed), allowed (forbidden in top7 is T16).
+- Position 8: T02 (seed), allowed (forbidden in top8 is T19).
+- Position 9: T04 (seed), allowed.
+- Position 10: T06 (seed), allowed (forbidden in top10 is T29).
+- Good.
+- Now, check must-above constraints within top 10:
+- - T23 > T03 (constraint 15): yes, T23 is above T03.
+- - T26 > T05 (constraint 17): yes.
+- - T09 > T25 (constraint 9): T25 is not in top 10, so no issue.
+- - T10 > T11 (constraint 2): T11 is not in top 10, so okay.
+- Other must-above constraints involving top 10 teams:
+- For example, T01 > T30 (constraint 10): T30 is not in top 10, so okay.
+- T02 > T27 (constraint 5): T27 not in top 10.
+- T04 > T21 (constraint 6): T21 not in top 10.
+- T06 > T17 (constraint 8): T17 not in top 10.
+- So all must-above constraints are satisfied for the top 10 teams.
+- Now, check adjacency bans in top 10.
+- Adjacency bans are pairs that cannot be adjacent:
+- (T02,T03), (T04,T05), (T06,T07), (T08,T09), (T10,T11), etc.
+- In our current top 10:
+- 1. T23
+- 2. T03
+- 3. T26
+- 4. T05
+- 5. T09
+- 6. T10
+- 7. T01
+- 8. T02
+- 9. T04
+- 10. T06
+- Check adjacents:
+- 1-2: T23 and T03 → not a banned pair.
+- 2-3: T03 and T26 → not banned.
+- 3-4: T26 and T05 → not banned.
+- 4-5: T05 and T09 → not banned.
+- 5-6: T09 and T10 → not banned (banned pairs are (T08,T09), (T10,T11), etc.)
+- 6-7: T10 and T01 → not banned.
+- 7-8: T01 and T02 → not banned (banned pairs start with (T02,T03), etc.)
+- 8-9: T02 and T04 → not banned.
+- 9-10: T04 and T06 → not banned.
+- So no adjacency violations in top 10.
+- Good.
+- Now, let's proceed to build the entire ranking.
+- We have the top 10 as:
+- 1. T23
+- 2. T03
+- 3. T26
+- 4. T05
+- 5. T09
+- 6. T10
+- 7. T01
+- 8. T02
+- 9. T04
+- 10. T06
+- Now, we need to fill positions 11-30, respecting all constraints.
+- Next, consider the must-above constraints that involve teams not yet placed.
+- For example:
+- Constraint 7: T03 > T12 → T12 must be below T03 (position 2), which it will be.
+- Constraint 15: T23 > T03 → already satisfied.
+- Constraint 17: T26 > T05 → satisfied.
+- Constraint 9: T09 > T25 → T25 must be below T09 (position 5).
+- Constraint 2: T10 > T11 → T11 below T10 (position 6).
+- Constraint 10: T01 > T30 → T30 below T01 (position 7).
+- Constraint 5: T02 > T27 → T27 below T02 (position 8).
+- Constraint 6: T04 > T21 → T21 below T04 (position 9).
+- Constraint 8: T06 > T17 → T17 below T06 (position 10).
+- Other constraints:
+- Constraint 1: T05 > T18 → T18 below T05 (position 4).
+- Constraint 3: T07 > T28 → T28 below T07.
+- Constraint 4: T08 > T19 → T19 below T08.
+- Constraint 11: T13 > T29 → T29 below T13.
+- Constraint 12: T14 > T20 → T20 below T14.
+- Constraint 13: T15 > T16 → T16 below T15.
+- Constraint 14: T22 > T08 → T08 below T22.
+- Constraint 16: T24 > T07 → T07 below T24.
+- Constraint 18: T25 > T14 → T14 below T25.
+- Constraint 19: T20 > T22 → T22 below T20.
+- Constraint 20: T28 > T15 → T15 below T28.
+- This is very complex. Let's try to build the ranking step by step, considering the chains.
+- We have several chains:
+- 1. T25 > T14 > T20 > T22 > T08 > T19 (from constraints 18,12,19,14,4)
+- 2. T23 > T03 > T12 (15,7)
+- 3. T24 > T07 > T28 > T15 > T16 (16,3,20,13)
+- 4. T26 > T05 > T18 (17,1)
+- 5. T02 > T27 (5)
+- 6. T01 > T30 (10)
+- 7. T10 > T11 (2)
+- 8. T04 > T21 (6)
+- 9. T06 > T17 (8)
+- 10. T13 > T29 (11)
+- Also, T09 > T25 (9), so T09 > T25 > T14 > ...
+- So combining chain 1 and 9:
+- T09 > T25 > T14 > T20 > T22 > T08 > T19
+- Chain 3: T24 > T07 > T28 > T15 > T16
+- Chain 4: T26 > T05 > T18
+- Chain 2: T23 > T03 > T12
+- Chain 5: T02 > T27
+- Chain 6: T01 > T30
+- Chain 7: T10 > T11
+- Chain 8: T04 > T21
+- Chain 10: T13 > T29
+- Now, let's try to interleave these chains.
+- We have top 10 as:
+- 1. T23 (chain 2)
+- 2. T03 (chain 2)
+- 3. T26 (chain 4)
+- 4. T05 (chain 4)
+- 5. T09 (chain 9)
+- 6. T10 (chain 7)
+- 7. T01 (chain 6)
+- 8. T02 (chain 5)
+- 9. T04 (chain 8)
+- 10. T06 (chain 10)
+- Now, positions 11-30 need to be filled with the remaining teams, respecting the chains.
+- Remaining teams:
+- From chain 2: T12
+- Chain 3: T24, T07, T28, T15, T16
+- Chain 4: T18
+- Chain 5: T27
+- Chain 6: T30
+- Chain 7: T11
+- Chain 8: T21
+- Chain 9: T25
+- Chain 1: T25, T14, T20, T22, T08, T19
+- Chain 10: T13, T29
+- Wait, let's list all teams and see which are placed:
+- Placed in top 10:
+- T23, T03, T26, T05, T09, T10, T01, T02, T04, T06
+- Remaining teams:
+- T07, T08, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22, T24, T25, T27, T28, T29, T30
+- Wait, total teams are 30. Top 10 placed 10, so 20 remaining.
+- Let's list all teams:
+- Seeds (T01-T10):
+- T01 (placed), T02 (placed), T03 (placed), T04 (placed), T05 (placed), T06 (placed), T07 (not), T08 (not), T09 (placed), T10 (placed)
+- Non-seeds:
+- T11-T30.
+- So remaining seeds: T07, T08
+- Remaining non-seeds: T11-T30 except those placed.
+- Placed non-seeds in top 10: T23, T26
+- So remaining teams:
+- T07, T08, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22, T24, T25, T27, T28, T29, T30
+- Now, let's consider the chains that need to be placed.
+- Chain A: T09 > T25 > T14 > T20 > T22 > T08 > T19
+- Chain B: T24 > T07 > T28 > T15 > T16
+- Chain C: T26 > T05 > T18 (T26 and T05 placed, so T18 next)
+- Chain D: T02 > T27 (T02 placed, so T27 next)
+- Chain E: T01 > T30 (T01 placed, so T30 next)
+- Chain F: T10 > T11 (T10 placed, so T11 next)
+- Chain G: T04 > T21 (T04 placed, so T21 next)
+- Chain H: T06 > T17 (T06 placed, so T17 next)
+- Chain I: T23 > T03 > T12 (T23 and T03 placed, so T12 next)
+- Chain J: T13 > T29
+- So the next positions (11-30) need to place:
+- From Chain A: T25, T14, T20, T22, T08, T19
+- Chain B: T24, T07, T28, T15, T16
+- Chain C: T18
+- Chain D: T27
+- Chain E: T30
+- Chain F: T11
+- Chain G: T21
+- Chain H: T17
+- Chain I: T12
+- Chain J: T13, T29
+- Let's try to order these chains.
+- First, Chain A: T25 must come before T14, which before T20, etc.
+- Chain B: T24 before T07 before T28 before T15 before T16.
+- Chain C: T18 after T05 (already placed).
+- Chain D: T27 after T02.
+- Chain E: T30 after T01.
+- Chain F: T11 after T10.
+- Chain G: T21 after T04.
+- Chain H: T17 after T06.
+- Chain I: T12 after T03.
+- Chain J: T13 before T29.
+- Also, other constraints:
+- Forbid-block:
+- - T14 cannot be in 11-15 → must be in 16-30
+- - T20 cannot be in 5-9 → already placed above 10, so okay.
+- - T23 cannot be in 13-17 → T23 is in position 1, which is fine.
+- - T02 cannot be in 21-25 → T02 is in position 8, fine.
+- - T09 cannot be in 26-30 → T09 is in position 5, fine.
+- Forbid-top already handled.
+- Adjacency bans: need to ensure no banned pairs are adjacent.
+- Diversity: any 5 consecutive teams have ≤2 from same group.
+- Let's try to place Chain A next.
+- Chain A: T25 > T14 > T20 > T22 > T08 > T19
+- We need to place these in order.
+- But T14 cannot be in 11-15 (forbid-block), so T14 must be in 16-30.
+- Therefore, T25 must be before T14, so T25 can be in 11-15, but T14 has to be in 16+.
+- Similarly, T20: forbid-block says T20 cannot be in 5-9, but T20 is in Chain A which comes after T14, which is after 15, so T20 will be in 16+, which is fine.
+- Let's try to place T25 in position 11.
+- Then T14 must be in 16+.
+- But T14 cannot be in 11-15, so earliest T14 can be is 16.
+- So positions for Chain A:
+- 11: T25
+- 16: T14
+- 20: T20
+- 24: T22
+- 28: T08
+- 30: T19
+- But need to fill the gaps with other chains.
+- Alternatively, interleave with other chains.
+- Let's consider Chain B: T24 > T07 > T28 > T15 > T16
+- T24 is a non-seed (group E: T21-T25), so T24 is in group E.
+- T07 is seed (group A).
+- T28 is group F.
+- T15 is group C.
+- T16 is group D.
+- Chain C: T18 (group D)
+- Chain D: T27 (group F)
+- Chain E: T30 (group F)
+- Chain F: T11 (group C)
+- Chain G: T21 (group E)
+- Chain H: T17 (group D)
+- Chain I: T12 (group C)
+- Chain J: T13 > T29 (group C and F)
+- Now, diversity constraint: any 5 consecutive teams have ≤2 from same group.
+- Groups:
+- A: T01-T05 (seeds 1-5)
+- B: T06-T10 (seeds 6-10)
+- C: T11-T15
+- D: T16-T20
+- E: T21-T25
+- F: T26-T30
+- In our current top 10:
+- 1. T23 (F)
+- 2. T03 (A)
+- 3. T26 (F)
+- 4. T05 (A)
+- 5. T09 (B)
+- 6. T10 (B)
+- 7. T01 (A)
+- 8. T02 (A)
+- 9. T04 (A)
+- 10. T06 (B)
+- Group counts in top 10:
+- A: T03, T05, T01, T02, T04 → 5 teams
+- B: T09, T10, T06 → 3 teams
+- F: T23, T26 → 2 teams
+- C, D, E: 0
+- So in positions 1-5: groups F, A, F, A, B → counts: F:2, A:2, B:1 → okay (≤2 per group in 5 consecutive).
+- Positions 6-10: B, A, A, A, B → B:2, A:3 → wait, positions 6-10 are T10 (B), T01 (A), T02 (A), T04 (A), T06 (B). So in 5 consecutive (6-10), group A has 3 teams (T01, T02, T04), which violates the diversity constraint (max 2 per group in any 5 consecutive).
+- Oh no! This is a problem.
+- The diversity constraint states: "In any consecutive window of 5 teams, no more than 2 teams from the same group."
+- In positions 6-10:
+- Team 6: T10 (group B)
+- Team 7: T01 (group A)
+- Team 8: T02 (group A)
+- Team 9: T04 (group A)
+- Team 10: T06 (group B)
+- So group A has 3 teams in positions 7-9 (teams 7,8,9), which is a window of 3 consecutive, but the constraint is for any consecutive window of 5. Wait, positions 6-10 is a window of 5, and within that, group A has 3 teams (positions 7,8,9), which is more than 2. So this violates the diversity constraint.
+- Ah, this is a critical mistake. Our initial top 10 has 3 seeds from group A in positions 7-9 (T01, T02, T04), which are all group A, plus T03 in position 2 (group A), so group A has 4 teams in top 10.
+- In the window positions 6-10: teams 6 (B),7 (A),8 (A),9 (A),10 (B) → group A has 3 teams, which violates the constraint.
+- So we need to adjust the top 10 to ensure that no 5 consecutive teams have more than 2 from the same group.
+- This means we need to spread out the group A teams (seeds T01-T05) more evenly.
+- Group A has 5 teams: T01-T05.
+- In the top 10, we have placed T01, T02, T03, T04, T05 (all group A seeds) in positions 2,4,7,8,9.
+- That's 5 group A teams in top 10, which is the entire group A.
+- To satisfy the diversity constraint, we need to ensure that in any 5 consecutive positions, no more than 2 are from group A.
+- With 5 group A teams in top 10, it's challenging but possible if they are spaced out.
+- For example, if group A teams are placed at positions 1,3,5,7,9.
+- Let's try to redesign the top 10 to spread out group A teams.
+- Alternative top 10:
+- 1. T01 (A)
+- 2. T06 (B)
+- 3. T02 (A)
+- 4. T07 (A) → but T07 has T24 above it, so T07 cannot be in top 10 unless T24 is also there and above.
+- Wait, T07 must be below T24 (constraint 16: T24 > T07). So to have T07 in top 10, T24 must be in top 10 and above T07.
+- Similarly for other seeds with non-seed constraints.
+- This complicates things.
+- Perhaps it's better to avoid placing seeds that require non-seeds above them in the top 10, to keep the top 10 free of such dependencies.
+- Let's try a different approach for top 10, focusing on seeds that don't have non-seed constraints forcing them down.
+- Seeds with no non-seed above them required:
+- - T01: only must be above T30
+- - T02: above T27
+- - T04: above T21
+- - T06: above T17
+- - T09: above T25
+- - T10: above T11
+- These six seeds can be placed in top 10 without needing extra non-seeds in top 10.
+- Let's try:
+- Top 10:
+- 1. T01 (A)
+- 2. T02 (A)
+- 3. T04 (A)
+- 4. T06 (A)
+- 5. T09 (B)
+- 6. T10 (B)
+- 7. T05 (A) → but T05 must be below T26, so T26 must be above T05. If T26 is in top 10, say position 8.
+- Wait, this is getting too tangled.
+- Alternative idea: Use the seed quota of 6, so place exactly 6 seeds in top 10, spaced out to satisfy diversity.
+- For example:
+- Positions 1-10:
+- 1. T01 (A)
+- 2. T06 (B)
+- 3. T02 (A)
+- 4. T07 (A) → but T07 needs T24 above, so T24 must be in top 10.
+- Not good.
+- Perhaps include non-seeds in top 10 to break up group concentrations.
+- For example:
+- 1. T01 (A)
+- 2. T11 (C)
+- 3. T02 (A)
+- 4. T12 (C)
+- 5. T03 (A)
+- 6. T13 (C)
+- 7. T04 (A)
+- 8. T14 (C) → but T14 is forbidden in top 5 (forbid-top: T14 not in top 5). So position 5 cannot have T14.
+- Forbid-top says T14 cannot be in top 5, so positions 1-5 cannot have T14.
+- So in top 5, no T14.
+- Let's try:
+- Top 10 with diversity in mind.
+- Group A has 5 teams (T01-T05), group B has 5 (T06-T10).
+- To have ≤2 from same group in any 5 consecutive, we need to interleave groups.
+- A possible pattern for top 10: A, B, A, B, A, B, A, B, A, B
+- But group A has 5 teams, group B has 5, so this would place 5 A and 5 B in top 10.
+- But seeds are T01-T10, which are groups A and B.
+- Group A: T01-T05 (seeds 1-5)
+- Group B: T06-T10 (seeds 6-10)
+- So if we alternate A and B in top 10:
+- 1. A (T01)
+- 2. B (T06)
+- 3. A (T02)
+- 4. B (T07)
+- 5. A (T03)
+- 6. B (T08)
+- 7. A (T04)
+- 8. B (T09)
+- 9. A (T05)
+- 10. B (T10)
+- This gives 5 A and 5 B in top 10, satisfying the diversity constraint for any 5 consecutive (since max 3 from a group in 5 consecutive, but wait, in positions 1-5: A,B,A,B,A → 3 A's, which violates the constraint (max 2).
+- Ah, right. So alternating A,B,A,B,A in 5 positions gives 3 A's, which is over the limit.
+- To have ≤2 per group in any 5 consecutive, the maximum number of a group in 10 positions is 4 (e.g., A,B,A,B,A,B,A,B,A,B has 5 A's and 5 B's, but in any 5 consecutive, it's 3 of one group).
+- Wait, no. For example, positions 1-5: A,B,A,B,A → 3 A's.
+- Which violates the constraint.
+- So to satisfy the constraint, in any 5 consecutive, ≤2 from a group.
+- This means that the maximum number of a group in 10 positions is 4, arranged as A,B,A,B,A,B,A,B,B,B but no.
+- Actually, the maximum density is 2 per 5, so 4 per 10.
+- For example: A,B,A,B,B,A,B,A,B,A → let's count:
+- Positions 1-5: A,B,A,B,B → A:2, B:3 → okay.
+- Positions 2-6: B,A,B,B,A → B:3, A:2 → okay.
+- Positions 3-7: A,B,B,A,B → A:2, B:3 → okay.
+- Positions 4-8: B,B,A,B,A → B:3, A:2 → okay.
+- Positions 5-9: B,A,B,A,B → B:3, A:2 → okay.
+- Positions 6-10: A,B,A,B,A → A:3, B:2 → violation.
+- Ah, positions 6-10 have 3 A's.
+- So to have 5 A's in 10 positions without violating, it's impossible because 5/10 = 0.5, and in any 5 consecutive, you'd have at least 2 or 3.
+- Wait, the constraint is "no more than 2 teams from the same group in any consecutive window of 5".
+- So for 10 teams, the maximum number of a single group is 4, arranged as A,B,A,B,A,B,A,B,B,B but no.
+- Wait, let's calculate:
+- In 10 positions, to have ≤2 per 5-window, the maximum number of a group is 4.
+- For example:
+- Positions: 1:A, 2:B, 3:A, 4:B, 5:C, 6:A, 7:B, 8:C, 9:A, 10:B
+- But we only have groups A-F.
+- Alternatively, for two groups:
+- A,B,A,B,C,A,B,A,B,C
+- But with only two groups, it's hard.
+- Actually, with two groups, the maximum number of a group in 10 positions without having 3 in any 5 consecutive is 4.
+- For example:
+- A,B,A,B,A,B,B,B,A,B
+- Check windows:
+- 1-5: A,B,A,B,A → 3 A's → violation.
+- Another try:
+- A,B,A,B,B,A,B,A,B,B
+- Windows:
+- 1-5: A,B,A,B,B → A:2, B:3 → okay.
+- 2-6: B,A,B,B,A → B:3, A:2 → okay.
+- 3-7: A,B,B,A,B → A:2, B:3 → okay.
+- 4-8: B,B,A,B,A → B:3, A:2 → okay.
+- 5-9: B,A,B,A,B → B:3, A:2 → okay.
+- 6-10: A,B,A,B,B → A:2, B:3 → okay.
+- So this works with 4 A's and 6 B's.
+- But we have 5 teams in group A and 5 in group B.
+- So it's impossible to have 5 of each without violating the constraint.
+- Therefore, to satisfy the diversity constraint, we can have at most 4 from group A and 4 from group B in top 10, but we have 5 in each group.
+- Wait, group A has 5 teams (T01-T05), group B has 5 (T06-T10).
+- So in top 10, if we include all 10 seeds, we have 5 A and 5 B, which will inevitably have some 5-window with 3 from a group.
+- For example, positions 1-5: A,B,A,B,A → 3 A's.
+- This violates the constraint.
+- Therefore, to satisfy the diversity constraint, we cannot have all 10 seeds in top 10.
+- We need to include some non-seeds in top 10 to break up the group concentrations.
+- For example, include 2 non-seeds from group C in top 10 to reduce the number of A and B teams.
+- Let's try:
+- Top 10:
+- 1. T01 (A)
+- 2. T11 (C)
+- 3. T02 (A)
+- 4. T12 (C)
+- 5. T03 (A)
+- 6. T06 (B)
+- 7. T04 (A)
+- 8. T07 (A) → but T07 needs T24 above, so T24 must be in top 10.
+- Not good.
+- Alternative idea: Place non-seeds from different groups in top 10 to space out the seeds.
+- For example:
+- 1. T01 (A)
+- 2. T16 (D) → but T16 is forbidden in top 7 (forbid-top: T16 not in top 7). So position 2 is okay, but position 7 cannot have T16.
+- Forbid-top says T16 cannot be in top 7, so positions 1-7 cannot have T16.
+- Similarly, T18 cannot be in top 4, T19 not in top 8, etc.
+- This is very restrictive.
+- Perhaps the best way is to construct the ranking while checking the diversity constraint as we go.
+- Let's try to build the ranking step by step, ensuring diversity.
+- Start with position 1.
+- Choose a team from a group that hasn't been used much.
+- Group A has 5 teams, B has 5, etc.
+- Let's try to place a non-seed in position 1 to reduce group concentration.
+- For example, T23 (F) as before.
+- Position 1: T23 (F)
+- Position 2: T01 (A) → group A count=1
+- Position 3: T11 (C) → group C count=1
+- Position 4: T02 (A) → group A count=2
+- Position 5: T12 (C) → group C count=2
+- Position 6: T03 (A) → group A count=3 → violation in positions 2-6: groups A,C,A,C,A → A:3 in 5 teams (positions 2-6: T01,A; T11,C; T02,A; T12,C; T03,A) → A has 3, which violates.
+- So positions 2-6 have 3 A's.
+- Not good.
+- Alternative:
+- 1. T01 (A)
+- 2. T06 (B)
+- 3. T02 (A)
+- 4. T07 (A) → but T07 needs T24 above, so T24 must be in position 1-3.
+- Let's try:
+- 1. T24 (E) → must be above T07
+- 2. T07 (A)
+- 3. T01 (A) → group A count=2
+- 4. T25 (E) → must be above T14
+- 5. T02 (A) → group A count=3 → violation in positions 1-5: E,A,A,A,E → A:3.
+- Not good.
+- Another try:
+- 1. T01 (A)
+- 2. T06 (B)
+- 3. T11 (C)
+- 4. T02 (A)
+- 5. T12 (C)
+- 6. T03 (A) → group A count=3 in positions 1-6, but window 2-6: B,C,A,A,A → A:3.
+- Violation.
+- Hmm.
+- Perhaps include more groups early.
+- 1. T11 (C)
+- 2. T16 (D) → but T16 forbidden in top 7, so position 2 is okay.
+- 3. T21 (E) → forbidden in top 2? T21 is forbidden in top 2 (forbid-top: T21 not in top 2), so position 3 is okay.
+- 4. T12 (C)
+- 5. T17 (D)
+- 6. T22 (E)
+- 7. T13 (C)
+- 8. T18 (D) → forbidden in top 4? T18 not in top 4, so position 8 is okay.
+- 9. T23 (F)
+- 10. T19 (D) → forbidden in top 8? T19 not in top 8, so position 10 is okay.
+- But this has no seeds in top 10, violating the seed quota (needs at least 6 seeds).
+- So must include seeds.
+- Let's try to include 6 seeds in top 10, spaced out.
+- Seeds to include: T01, T02, T04, T06, T09, T10 (6 seeds)
+- Non-seeds to include: T11, T12, T13, T15, T17, T20 (to break up groups)
+- Top 10:
+- 1. T01 (A)
+- 2. T11 (C)
+- 3. T02 (A)
+- 4. T12 (C)
+- 5. T04 (A) → group A count=3 in positions 1-5 → violation.
+- No good.
+- Alternative:
+- 1. T01 (A)
+- 2. T06 (B)
+- 3. T02 (A)
+- 4. T07 (A) → but T07 needs T24 above.
+- Include T24:
+- 1. T24 (E)
+- 2. T07 (A)
+- 3. T01 (A) → group A count=2
+- 4. T25 (E)
+- 5. T02 (A) → group A count=3 in positions 1-5 → violation.
+- Still bad.
+- What if we place seeds from different groups:
+- Group A seeds: T01, T02, T03, T04, T05
+- Group B seeds: T06, T07, T08, T09, T10
+- To have ≤2 from same group in any 5 consecutive, we can do:
+- A, B, A, B, C, A, B, C, A, B
+- This way, in any 5 consecutive, max 2 from A or B.
+- Let's try:
+- 1. T01 (A)
+- 2. T06 (B)
+- 3. T02 (A)
+- 4. T07 (A) → violation, two A's in a row, but in window 1-5: A,B,A,A,... → positions 3-7 would have issues.
+- Wait:
+- 1. T01 (A)
+- 2. T06 (B)
+- 3. T02 (A)
+- 4. T07 (B)
+- 5. T03 (A) → window 1-5: A,B,A,B,A → 3 A's → violation.
+- Ah, yes.
+- To avoid 3 in 5, need to have at most 2 A's in any 5 consecutive.
+- So the pattern should be A,B,A,B,C,A,B,A,B,C
+- With C being other groups.
+- For top 10:
+- 1. A
+- 2. B
+- 3. A
+- 4. B
+- 5. C
+- 6. A
+- 7. B
+- 8. C
+- 9. A
+- 10. B
+- This gives 4 A's, 4 B's, 2 C's in top 10.
+- Check windows:
+- 1-5: A,B,A,B,C → A:2, B:2, C:1 → okay.
+- 2-6: B,A,B,C,A → B:2, A:2, C:1 → okay.
+- 3-7: A,B,C,A,B → A:2, B:2, C:1 → okay.
+- 4-8: B,C,A,B,C → B:2, A:1, C:2 → okay.
+- 5-9: C,A,B,C,A → C:2, A:2, B:1 → okay.
+- 6-10: A,B,C,A,B → A:2, B:2, C:1 → okay.
+- Perfect.
+- So we need 4 A's, 4 B's, and 2 from other groups in top 10.
+- Group A has 5 teams, group B has 5.
+- So we can choose 4 from A and 4 from B, plus 2 non-seeds (not A or B).
+- Non-seeds are groups C-F.
+- Let's select:
+- A seeds: T01, T02, T03, T04 (4 teams)
+- B seeds: T06, T07, T08, T09 (4 teams)
+- Non-seeds: T11 (C), T12 (C)
+- Top 10:
+- 1. T01 (A)
+- 2. T06 (B)
+- 3. T02 (A)
+- 4. T07 (B)
+- 5. T11 (C)
+- 6. T03 (A)
+- 7. T08 (B)
+- 8. T12 (C)
+- 9. T04 (A)
+- 10. T09 (B)
+- Now, check diversity:
+- Groups in top 10:
+- A: T01, T02, T03, T04 → 4
+- B: T06, T07, T08, T09 → 4
+- C: T11, T12 → 2
+- D, E, F: 0
+- Check windows:
+- 1-5: A,B,A,B,C → A:2, B:2, C:1 → okay.
+- 2-6: B,A,B,C,A → B:2, A:2, C:1 → okay.
+- 3-7: A,B,C,A,B → A:2, B:2, C:1 → okay.
+- 4-8: B,C,A,B,C → B:2, A:1, C:2 → okay.
+- 5-9: C,A,B,C,A → C:2, A:2, B:1 → okay.
+- 6-10: A,B,C,A,B → A:2, B:2, C:1 → okay.
+- Perfect, satisfies diversity.
+- Now, check forbid-top constraints for these positions:
+- Position 1: T01 (allowed)
+- Position 2: T06 (allowed)
+- Position 3: T02 (allowed)
+- Position 4: T07 (allowed)
+- Position 5: T11 (allowed; forbid-top doesn't restrict T11)
+- Position 6: T03 (allowed)
+- Position 7: T08 (allowed)
+- Position 8: T12 (allowed)
+- Position 9: T04 (allowed)
+- Position 10: T09 (allowed)
+- Forbid-top constraints:
+- - T27 not in top3: positions 1-3 have T01, T06, T02 → okay.
+- - T14 not in top5: positions 1-5 have T01, T06, T02, T07, T11 → okay.
+- - T18 not in top4: positions 1-4 okay.
+- - T21 not in top2: position 2 is T06, okay.
+- - T22 not in top6: position 6 is T03, okay.
+- - T19 not in top8: position 8 is T12, okay.
+- - T16 not in top7: position 7 is T08, okay.
+- - T29 not in top10: position 10 is T09, okay.
+- Good.
+- Now, check must-above constraints within top 10:
+- - T10 must be above T11 (constraint 2). T10 is not in top 10 yet; T11 is in position 5. So T10 must be ranked above T11, but T10 is not in top 10, so it will be in positions 11-30, which is below T11. This violates the must-above constraint.
+- Ah, problem! T10 must be above T11, but in this ranking, T11 is in position 5 and T10 is not in top 10 (will be later), so T10 is below T11, violating constraint 2.
+- So we need to include T10 in top 10 and above T11.
+- Similarly, other must-above constraints.
+- Let's adjust to include T10 and T05, etc.
+- Revised top 10 to include T10 and satisfy must-above:
+- We need T10 > T11, so if T11 is in top 10, T10 must be above it.
+- Similarly, T05 > T18, but T18 is non-seed.
+- Let's try:
+- Top 10:
+- 1. T10 (B) → seed
+- 2. T01 (A)
+- 3. T06 (B)
+- 4. T02 (A)
+- 5. T07 (B)
+- 6. T11 (C) → must have T10 > T11, which is satisfied (T10 in 1, T11 in 6)
+- 7. T03 (A)
+- 8. T08 (B)
+- 9. T12 (C)
+- 10. T04 (A)
+- Now, groups:
+- A: T01, T02, T03, T04 → 4
+- B: T10, T06, T07, T08 → 4
+- C: T11, T12 → 2
+- Check diversity windows:
+- 1-5: B,A,B,A,B → B:3 → violation (positions 1,3,5 are B).
+- Yes, positions 1,3,5 are B teams (T10, T06, T07), so 3 B's in 5 consecutive → violation.
+- Not good.
+- Alternative pattern with T10 included:
+- 1. T01 (A)
+- 2. T10 (B)
+- 3. T02 (A)
+- 4. T06 (B)
+- 5. T03 (A)
+- 6. T07 (B)
+- 7. T11 (C)
+- 8. T04 (A)
+- 9. T08 (B)
+- 10. T12 (C)
+- Groups:
+- A: T01, T02, T03, T04 → 4
+- B: T10, T06, T07, T08 → 4
+- C: T11, T12 → 2
+- Check window 1-5: A,B,A,B,A → A:3 → violation.
+- Same problem.
+- To avoid 3 in a row, need to space them out.
+- How about:
+- 1. T01 (A)
+- 2. T06 (B)
+- 3. T02 (A)
+- 4. T07 (B)
+- 5. T11 (C)
+- 6. T03 (A)
+- 7. T08 (B)
+- 8. T12 (C)
+- 9. T04 (A)
+- 10. T10 (B)
+- Now, B teams are T06, T07, T08, T10 → 4
+- A teams: T01, T02, T03, T04 → 4
+- C: T11, T12 → 2
+- Check windows:
+- 1-5: A,B,A,B,C → A:2, B:2, C:1 → okay.
+- 2-6: B,A,B,C,A → B:2, A:2, C:1 → okay.
+- 3-7: A,B,C,A,B → A:2, B:2, C:1 → okay.
+- 4-8: B,C,A,B,C → B:2, A:1, C:2 → okay.
+- 5-9: C,A,B,C,A → C:2, A:2, B:1 → okay.
+- 6-10: A,B,C,A,B → A:2, B:2, C:1 → okay.
+- Perfect.
+- Now, check must-above constraints:
+- - T10 > T11: T10 is in position 10, T11 in position 5 → T11 is above T10, which violates the constraint. Must have T10 above T11.
+- So swap T10 and T11:
+- Top 10:
+- 1. T01 (A)
+- 2. T06 (B)
+- 3. T02 (A)
+- 4. T07 (B)
+- 5. T10 (B) → seed
+- 6. T11 (C) → must have T10 > T11, which is satisfied (T10 in 5, T11 in 6)
+- 7. T03 (A)
+- 8. T08 (B)
+- 9. T12 (C)
+- 10. T04 (A)
+- Now, groups:
+- A: T01, T02, T03, T04 → 4
+- B: T06, T07, T10, T08 → 4
+- C: T11, T12 → 2
+- Check diversity windows:
+- 1-5: A,B,A,B,B → B:3 (positions 2,4,5) → violation.
+- Yes, positions 2,4,5 are B teams (T06, T07, T10), so 3 B's in 5 consecutive.
+- Not good.
+- Move T10 to position 4:
+- 1. T01 (A)
+- 2. T06 (B)
+- 3. T02 (A)
+- 4. T10 (B)
+- 5. T07 (B) → B:3 in positions 2-5 (T06, T10, T07) → violation.
+- Still bad.
+- Place T10 in position 6:
+- 1. T01 (A)
+- 2. T06 (B)
+- 3. T02 (A)
+- 4. T07 (B)
+- 5. T11 (C)
+- 6. T10 (B) → T10 > T11 satisfied (T10 in 6, T11 in 5? No, T11 is in 5, T10 in 6 → T11 is above T10, which violates T10 > T11.
+- Must have T10 above T11, so T10 must be in a lower position number than T11.
+- So T10 in position x, T11 in position y > x.
+- So in the ranking, T10 comes before T11.
+- So in top 10, if T11 is in position 5, T10 must be in 1-4.
+- Let's try:
+- 1. T10 (B)
+- 2. T01 (A)
+- 3. T06 (B)
+- 4. T02 (A)
+- 5. T07 (B)
+- 6. T11 (C) → T10 (1) > T11 (6) satisfied
+- 7. T03 (A)
+- 8. T08 (B)
+- 9. T12 (C)
+- 10. T04 (A)
+- Groups:
+- A: T01, T02, T03, T04 → 4
+- B: T10, T06, T07, T08 → 4
+- C: T11, T12 → 2
+- Check window 1-5: B,A,B,A,B → B:3 (positions 1,3,5) → violation.
+- Yes.
+- To fix this, insert a non-B team in position 5.
+- How about:
+- 1. T01 (A)
+- 2. T06 (B)
+- 3. T11 (C)
+- 4. T02 (A)
+- 5. T07 (B)
+- 6. T10 (B) → T10 > T11? T11 is in 3, T10 in 6 → T11 is above T10, which violates T10 > T11.
+- No good.
+- Alternative:
+- 1. T10 (B)
+- 2. T01 (A)
+- 3. T11 (C) → but T10 must be > T11, so T11 cannot be above T10. So T11 must be below T10.
+- So T10 in position x, T11 in y > x.
+- So T11 cannot be in position 2 if T10 is in 1.
+- Let's try:
+- 1. T10 (B)
+- 2. T01 (A)
+- 3. T06 (B)
+- 4. T02 (A)
+- 5. T11 (C) → T10 (1) > T11 (5) satisfied
+- 6. T07 (B)
+- 7. T03 (A)
+- 8. T08 (B)
+- 9. T12 (C)
+- 10. T04 (A)
+- Groups:
+- A: T01, T02, T03, T04 → 4
+- B: T10, T06, T07, T08 → 4
+- C: T11, T12 → 2
+- Window 1-5: B,A,B,A,C → B:2, A:2, C:1 → okay.
+- Window 2-6: A,B,A,C,B → A:2, B:2, C:1 → okay.
+- Window 3-7: B,A,C,B,A → B:2, A:2, C:1 → okay.
+- Window 4-8: A,C,B,A,B → A:2, B:2, C:1 → okay.
+- Window 5-9: C,B,A,B,C → C:2, B:2, A:1 → okay.
+- Window 6-10: B,A,B,C,A → B:2, A:2, C:1 → okay.
+- Perfect! This works.
+- Now, check must-above constraints within top 10:
+- - T10 > T11: T10 in 1, T11 in 5 → satisfied.
+- Other must-above constraints involving top 10 teams:
+- - T01 > T30 (constraint 10): T30 will be below T01.
+- - T02 > T27 (constraint 5): T27 below T02.
+- - T03 > T12 (constraint 7): T12 is in position 9, T03 in 7 → satisfied.
+- - T04 > T21 (constraint 6): T21 below T04.
+- - T06 > T17 (constraint 8): T17 below T06.
+- - T07 > T28 (constraint 3): T28 below T07.
+- - T08 > T19 (constraint 4): T19 below T08.
+- Good.
+- Now, check forbid-top constraints:
+- - T27 not in top3: positions 1-3 are T10, T01, T06 → okay.
+- - T14 not in top5: positions 1-5 okay.
+- - T18 not in top4: positions 1-4 okay.
+- - T21 not in top2: position 2 is T01, okay.
+- - T22 not in top6: position 6 is T07, okay.
+- - T19 not in top8: position 8 is T08, okay.
+- - T16 not in top7: position 7 is T03, okay.
+- - T29 not in top10: position 10 is T04, okay.
+- Good.
+- Adjacency bans in top 10:
+- Pairs to check:
+- (T02,T03): T02 is in 4, T03 in 7 → not adjacent.
+- (T04,T05): T04 in 10, T05 not in top 10.
+- (T06,T07): T06 in 3, T07 in 6 → not adjacent (positions 3 and 6 have 2 teams in between).
+- (T08,T09): T08 in 8, T09 not in top 10.
+- (T10,T11): T10 in 1, T11 in 5 → not adjacent.
+- Other banned pairs don't involve top 10 teams in adjacent positions.
+- Good.
+- Seed quota: top 10 has seeds T10, T01, T02, T06, T07, T08, T03, T04 → 8 seeds, which is ≥6.
+- Perfect.
+- Now, top 10 is:
+- 1. T10
+- 2. T01
+- 3. T06
+- 4. T02
+- 5. T11
+- 6. T07
+- 7. T03
+- 8. T08
+- 9. T12
+- 10. T04
+- Groups:
+- 1: B (T10)
+- 2: A (T01)
+- 3: B (T06)
+- 4: A (T02)
+- 5: C (T11)
+- 6: B (T07)
+- 7: A (T03)
+- 8: B (T08)
+- 9: C (T12)
+- 10: A (T04)
+- Group counts per window are okay as checked.
+- Now, let's proceed to fill positions 11-30.
+- Remaining teams:
+- Seeds: T05, T09
+- Non-seeds: T13, T14, T15, T16, T17, T18, T19, T20, T21, T22, T23, T24, T25, T26, T27, T28, T29, T30
+- Wait, total teams are 30. Top 10 placed 10, so 20 remaining.
+- List all teams:
+- Seeds (T01-T10):
+- T01 (2), T02 (4), T03 (7), T04 (10), T05 (?), T06 (3), T07 (6), T08 (8), T09 (?), T10 (1)
+- So remaining seeds: T05, T09
+- Non-seeds: T11 (5), T12 (9) are placed, so remaining non-seeds: T13-T30 except T11, T12.
+- T13, T14, T15, T16, T17, T18, T19, T20, T21, T22, T23, T24, T25, T26, T27, T28, T29, T30 → 18 teams.
+- Plus seeds T05, T09 → total 20.
+- Now, must-above constraints involving remaining teams:
+- Chain A: T09 > T25 > T14 > T20 > T22 > T08 > T19
+- But T08 is already placed in position 8, so T22 > T08 means T22 must be above T08, but T08 is in position 8, so T22 must be in 1-7. However, in our top 10, positions 1-7 are T10, T01, T06, T02, T11, T07, T03. None of these are T22 (group E: T21-T25), so T22 must be in positions 11-7? Impossible, since 11 >7. This is a problem.
+- Wait, constraint 14: T22 > T08.
+- T08 is in position 8, so T22 must be ranked higher than T08, i.e., in positions 1-7.
+- But in our current top 10, positions 1-7 are filled with other teams, none of which is T22.
+- This means our top 10 is invalid because it violates the must-above constraint T22 > T08.
+- Ah, critical mistake!
+- Constraint 14: T22 must be above T08.
+- In our current ranking, T08 is in position 8, so T22 must be in 1-7.
+- But we didn't include T22 in top 10, so it will be in positions 11+, which is below T08, violating the constraint.
+- This means we must include T22 in top 10 and place it above T08.
+- Similarly, other constraints like T23 > T03 (constraint 15), so T23 must be above T03 (position 7), so T23 must be in 1-6.
+- T24 > T07 (constraint 16), T07 is in position 6, so T24 must be in 1-5.
+- T26 > T05 (constraint 17), but T05 is not placed yet.
+- T25 > T14 (constraint 18), etc.
+- This changes everything. We must include T22, T23, T24, T26 in top 10 if we want to have T08, T03, T07, T05 in top 10.
+- Given the complexity, perhaps the only way to satisfy all must-above constraints is to include the required non-seeds in the top part of the ranking.
+- Let's try to build the ranking by respecting the longest chains first.
+- Longest chain we identified earlier:
+- T09 > T25 > T14 > T20 > T22 > T08 > T19 (7 teams)
+- Another chain: T23 > T03 > T12 (3 teams)
+- T24 > T07 > T28 > T15 > T16 (5 teams)
+- T26 > T05 > T18 (3 teams)
+- T02 > T27 (2)
+- T01 > T30 (2)
+- T10 > T11 (2)
+- T04 > T21 (2)
+- T06 > T17 (2)
+- T13 > T29 (2)
+- To satisfy all must-above, we need to interleave these chains.
+- Let's try to place the longest chain first.
+- Chain A: T09, T25, T14, T20, T22, T08, T19
+- But T09 is a seed (group B), T25 group E, T14 group C, T20 group D, T22 group E, T08 group B, T19 group D.
+- Chain B: T23 (F), T03 (A), T12 (C)
+- Chain C: T24 (E), T07 (A), T28 (F), T15 (C), T16 (D)
+- Chain D: T26 (F), T05 (A), T18 (D)
+- Chain E: T02 (A), T27 (F)
+- Chain F: T01 (A), T30 (F)
+- Chain G: T10 (B), T11 (C)
+- Chain H: T04 (A), T21 (E)
+- Chain I: T06 (B), T17 (D)
+- Chain J: T13 (C), T29 (F)
+- Now, let's try to merge these chains while respecting order.
+- Start with Chain B: T23 > T03 > T12
+- Chain C: T24 > T07 > T28 > T15 > T16
+- Chain D: T26 > T05 > T18
+- Chain A: T09 > T25 > T14 > T20 > T22 > T08 > T19
+- Chain E: T02 > T27
+- Chain F: T01 > T30
+- Chain G: T10 > T11
+- Chain H: T04 > T21
+- Chain I: T06 > T17
+- Chain J: T13 > T29
+- Let's try to place Chain B and Chain C first, as they involve seeds T03, T07 which have non-seeds above them.
+- Top positions:
+- 1. T23 (F) [Chain B]
+- 2. T24 (E) [Chain C]
+- 3. T03 (A) [Chain B]
+- 4. T07 (A) [Chain C]
+- 5. T26 (F) [Chain D]
+- 6. T05 (A) [Chain D]
+- 7. T09 (B) [Chain A]
+- 8. T25 (E) [Chain A]
+- 9. T14 (C) [Chain A] → but T14 cannot be in top 5 (forbid-top: T14 not in top 5). Position 9 is okay.
+- 10. T20 (D) [Chain A]
+- Now, top 10:
+- 1. T23 (F)
+- 2. T24 (E)
+- 3. T03 (A)
+- 4. T07 (A)
+- 5. T26 (F)
+- 6. T05 (A)
+- 7. T09 (B)
+- 8. T25 (E)
+- 9. T14 (C)
+- 10. T20 (D)
+- Check diversity:
+- Groups:
+- F, E, A, A, F, A, B, E, C, D
+- Group A count in top 10: positions 3,4,6 → 3 teams.
+- Check windows:
+- 1-5: F,E,A,A,F → A:2, F:2, E:1 → okay.
+- 2-6: E,A,A,F,A → A:3 → violation (positions 3,4,6 are A).
+- Yes, positions 3,4,6 are A teams (T03, T07, T05), so in window 2-6 (positions 2-6: E,A,A,F,A), group A has 3 teams → violation.
+- Not good.
+- Adjust to space out group A teams.
+- 1. T23 (F)
+- 2. T01 (A)
+- 3. T24 (E)
+- 4. T02 (A)
+- 5. T26 (F)
+- 6. T03 (A)
+- 7. T09 (B)
+- 8. T04 (A)
+- 9. T25 (E)
+- 10. T05 (A)
+- Group A count: 5 teams in top 10.
+- Window 1-5: F,A,E,A,F → A:2, F:2, E:1 → okay.
+- Window 2-6: A,E,A,F,A → A:3 → violation.
+- Still bad.
+- Alternative approach: Use a greedy algorithm to build the ranking while checking constraints.
+- Start with an empty ranking.
+- While there are teams left:
+- - Choose a team that has no must-above constraints left (i.e., all teams that must be above it are already placed), and that doesn't violate other constraints (adjacency, forbid-top/block, diversity).
+- But with 30 teams, this is time-consuming manually.
+- Given the time constraints, perhaps the intended solution is to use a topological sort of the must-above graph, then adjust for other constraints, and hope the violations are under 650.
+- But to meet the violation bound, we need the ranking to be as close as possible to the "natural" order where higher-ranked teams beat lower-ranked ones.
+- Given the match results are determined by (i+j) % 2:
+- - If i and j have the same parity (both even or both odd indices), then i beats j.
+- - If different parity, j beats i.
+- Indices are 0-based (T01=0, T02=1, ..., T30=29).
+- So for team X with index x, team Y with index y:
+- - If x and y have the same parity, X beats Y if x < y (since i=x, j=y, i < j).
+- Wait, no: in the code, for i < j, if (i+j) even, teams[i] beats teams[j].
+- So for two teams with indices x and y, x < y:
+- - If (x + y) even → x beats y
+- - If (x + y) odd → y beats x
+- So the winner is determined by the parity of the sum of their indices.
+- For example:
+- T01 (0) vs T02 (1): 0+1=1 odd → T02 beats T01
+- T01 (0) vs T03 (2): 0+2=2 even → T01 beats T03
+- T02 (1) vs T03 (2): 1+2=3 odd → T03 beats T02
+- So the win direction alternates based on parity.
+- To minimize violations, we want higher-ranked teams to have beaten lower-ranked teams.
+- So ideally, for a ranking where team A is ranked higher than team B, we want A to have beaten B.
+- The total violations will be the sum of weights for all pairs where B is ranked higher than A but B beat A.
+- Given the win direction is based on parity, let's see:
+- If two teams have indices of the same parity, the lower index (earlier team) beats the higher index.
+- If different parity, the higher index beats the lower index.
+- For example:
+- Team with index 0 (T01) beats teams with even indices >0 (T03, T05, etc.)
+- Team with index 1 (T02) beats teams with odd indices >1 (T04, T06, etc.)
+- Team with index 2 (T03) beats teams with even indices >2 (T05, T07, etc.)
+- So the natural order where teams are ranked by their index (T01, T02, ..., T30) would have many violations because:
+- - T02 (index 1) beats T01 (index 0) → violation if T01 is ranked above T02.
+- - T03 (index 2) beats T01 (index 0) and T02 (index 1) → violations if T01 or T02 are above T03.
+- In fact, in the natural order (T01, T02, ..., T30), the violations would be high because many lower-indexed teams (which are ranked higher) are beaten by higher-indexed teams.
+- To minimize violations, we might want to rank teams in an order where teams with even indices come before odd indices, or vice versa, to align with the win direction.
+- For example, if we rank all even-indexed teams first, then odd-indexed teams.
+- Even indices: 0,2,4,...,28 (T01, T03, T05, ..., T29)
+- Odd indices: 1,3,5,...,29 (T02, T04, ..., T30)
+- In this ranking, for any even i and odd j > i:
+- - i is even, j is odd → i + j is odd → j beats i. But in the ranking, i (even) is before j (odd), so j is lower-ranked and beat i (higher-ranked), which is a violation.
+- Not good.
+- Alternatively, rank odd indices first, then even.
+- Odd indices: 1,3,5,...,29 (T02, T04, ..., T30)
+- Even indices: 0,2,4,...,28 (T01, T03, ..., T29)
+- For i odd, j even, i < j:
+- i + j is odd + even = odd → j beats i.
+- In the ranking, i (odd) is before j (even), so j is lower-ranked and beat i → violation.
+- Same issue.
+- Another approach: Teams with index x where x is even beat teams with index y > x if y is even (since x+y even).
+- Teams with index x odd beat teams with index y > x if y is odd.
+- So within even indices, the natural order (0,2,4,...) has 0 beats 2, 0 beats 4, 2 beats 4, etc. So no violations within even indices.
+- Within odd indices, natural order (1,3,5,...) has 1 beats 3, 1 beats 5, 3 beats 5, etc. No violations within odd indices.
+- Between even and odd:
+- - Even x beats odd y if x > y (since x even, y odd, x+y odd → y beats x? Wait:
+- Wait, for x even, y odd, x < y:
+- x + y = even + odd = odd → y beats x.
+- So if x is even and y is odd, and x < y, then y beats x.
+- In the natural order (0,1,2,3,...), team 0 (even) is before team 1 (odd), but team 1 beats team 0 → violation.
+- Team 2 (even) is after team 1 (odd), team 1 beats team 2 → violation if team 1 is ranked above team 2.
+- This is messy.
+- Perhaps the minimal violation ranking is to group even and odd indices separately.
+- For example, rank all even-indexed teams in increasing order, then all odd-indexed teams in increasing order.
+- Even indices: 0,2,4,...,28 (T01, T03, T05, T07, T09, T11, T13, T15, T17, T19, T21, T23, T25, T27, T29)
+- Odd indices: 1,3,5,...,29 (T02, T04, T06, T08, T10, T12, T14, T16, T18, T20, T22, T24, T26, T28, T30)
+- Total 15 even, 15 odd.
+- In this ranking:
+- - Within even group: no violations, since even i < even j → i beats j.
+- - Within odd group: no violations, since odd i < odd j → i beats j.
+- - Between groups: even i vs odd j.
+- If i < j:
+- - If i even, j odd: i + j odd → j beats i. In the ranking, i (even) is before j (odd), so j is lower-ranked and beat i → violation with weight w.
+- If i > j:
+- - i even, j odd, i > j: i + j odd → j beats i. In the ranking, j (odd) is before i (even), so i is lower-ranked and beat j? No:
+- Wait, j is odd index < i (even index).
+- j + i = odd + even = odd → i beats j.
+- In the ranking, j is before i, so i is lower-ranked. i beat j, which is a violation (lower-ranked team beat higher-ranked).
+- So between groups, every pair where even and odd indices are interleaved will have a violation.
+- To minimize violations between groups, we can place all even or all odd first.
+- Suppose we place all even-indexed teams first, then odd.
+- Even group: 15 teams, no internal violations.
+- Odd group: 15 teams, no internal violations.
+- Between groups:
+- For any even i and odd j:
+- - If i < j: j beats i (since i+j odd), and in ranking i is before j → violation.
+- - If i > j: i beats j (since i+j odd), and in ranking j is before i → violation.
+- So every cross-group pair is a violation.
+- Total cross-group pairs: 15*15=225.
+- Each with weight 1-5, average 3, so total violations ~675, which is over the 650 bound.
+- Close, but might be over.
+- If we can arrange the ranking to have some cross-group pairs where the higher-ranked team actually won.
+- For example, if we rank a team with high even index before a team with low odd index.
+- Let's say team with index 28 (T29) before team with index 1 (T02).
+- 28 + 1 = 29 odd → T02 beats T29.
+- In the ranking, T29 is before T02, so T02 is lower-ranked and beat T29 → violation.
+- Same issue.
+- Alternatively, rank teams in an order that follows the win direction.
+- For team X to beat team Y, X should be ranked higher than Y.
+- From the win condition:
+- X beats Y iff (x + y) even and x < y.
+- So to have X ranked higher than Y when X beats Y, we need to rank teams in an order where if (x + y) even and x < y, then X is before Y.
+- This is equivalent to ranking teams by their index in an order that groups by parity.
+- For example, all even indices in increasing order, then all odd indices in increasing order.
+- In this case, for even x < even y: x beats y, and x is before y → no violation.
+- For odd x < odd y: x beats y, and x is before y → no violation.
+- For even x and odd y:
+- - If x < y: y beats x (since x+y odd), but x is before y → violation.
+- - If x > y: x beats y (since x+y odd), but y is before x → violation.
+- So the only violations are between even and odd groups.
+- To minimize these, perhaps interleave even and odd teams in a way that when x < y and x even, y odd, we have y before x only if y beats x, but y beats x when x < y and x even, y odd.
+- Wait, if x even, y odd, x < y:
+- y beats x.
+- So if we rank y before x, then it's a violation (y is lower-ranked and beat x).
+- If we rank x before y, it's a violation (x is higher-ranked but lost to y).
+- So every cross-parity pair is a violation, regardless of order.
+- The only way to have no violations is to have all teams in the same parity group, which is impossible.
+- Therefore, the minimal possible violations are the sum of weights for all cross-parity pairs.
+- There are 15 even and 15 odd teams.
+- Number of cross-parity pairs: 15*15=225.
+- Each pair has a weight between 1-5.
+- Total minimal violations would be the sum of weights for all cross-parity pairs.
+- Given the seed is 42, we can estimate this sum.
+- But since we need total violations ≤650, and 225 pairs * 3 average = 675, which is over 650, we need a ranking that has fewer violations by having some intra-parity pairs where the ranking order matches the win direction, and minimizing the cross-parity violations.
+- Wait, no: within parity groups, the natural order (increasing index) has no violations.
+- Between parity groups, every pair is a violation regardless of order.
+- Wait, no:
+- If we have two teams from different parity groups, say even x and odd y.
+- Case 1: x < y
+- - x + y is odd → y beats x.
+- - If we rank x before y: x is higher-ranked, but y beat x → violation.
+- - If we rank y before x: y is higher-ranked, and y beat x → no violation.
+- Ah! This is key.
+- If x < y, x even, y odd:
+- y beats x.
+- So if we rank y before x, then y is higher-ranked and beat x → no violation.
+- If we rank x before y, it's a violation.
+- Similarly, if x > y, x even, y odd:
+- x + y is odd → x beats y.
+- So if we rank x before y, x is higher-ranked and beat y → no violation.
+- If we rank y before x, it's a violation.
+- Therefore, to avoid violations between parity groups, we should rank teams such that for any x and y:
+- - If x < y and x even, y odd: rank y before x
+- - If x > y and x even, y odd: rank x before y
+- This is equivalent to ranking all odd-indexed teams before even-indexed teams when the odd index is less than the even index, and even before odd when even index is greater.
+- This is similar to a merge of the two sequences.
+- For example, consider the indices as two lists:
+- Even: 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28
+- Odd: 1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29
+- To satisfy the condition that for x even, y odd:
+- - If x < y, rank y before x
+- - If x > y, rank x before y
+- This means that for any y odd and x even:
+- - If y < x, rank y before x
+- - If y > x, rank x before y
+- Which is equivalent to ranking all teams in increasing order of their index, but swapping even and odd when necessary.
+- Wait, no. Let's take specific examples.
+- Team with index 0 (even) and 1 (odd):
+- 0 < 1, even < odd → should rank 1 before 0 to avoid violation (since 1 beats 0).
+- Team 0 and 3 (odd):
+- 0 < 3 → rank 3 before 0.
+- Team 2 (even) and 1 (odd):
+- 2 > 1 → should rank 2 before 1 (since 2 beats 1? Let's check:
+- 2 + 1 = 3 odd → 1 beats 2.
+- So team 1 beats team 2.
+- If we rank 2 before 1, then team 2 is higher-ranked but lost to team 1 → violation.
+- If we rank 1 before 2, team 1 is higher-ranked and beat team 2 → no violation.
+- So for x=2 (even), y=1 (odd), x > y:
+- y=1 beats x=2.
+- So to avoid violation, rank y=1 before x=2.
+- This suggests that we should rank all odd-indexed teams before even-indexed teams, regardless of their index values.
+- Let's test:
+- Rank all odd indices first in increasing order, then even indices in increasing order.
+- Odd indices: 1,3,5,...,29 (T02, T04, ..., T30)
+- Even indices: 0,2,4,...,28 (T01, T03, ..., T29)
+- Now, for any odd y and even x:
+- - If y < x: y is before x in ranking. y beats x (since y + x odd), so no violation.
+- - If y > x: y is before x. y + x odd → x beats y? No:
+- y odd, x even, y > x:
+- y + x = odd + even = odd → x beats y.
+- In ranking, y is before x, so x is lower-ranked and beat y → violation.
+- For example, y=3 (odd), x=2 (even), y > x:
+- 3 + 2 = 5 odd → x=2 beats y=3.
+- In ranking, y=3 is before x=2, so x=2 is lower-ranked and beat y=3 → violation.
+- So this also has violations.
+- The only way to have no violations between groups is to have a ranking where for every pair of different parity, the higher-ranked team beat the lower-ranked team.
+- Given the win condition, this is possible if we rank teams in an order that follows the win direction.
+- For team A to beat team B, A should be ranked higher than B.
+- From the win condition:
+- A beats B iff (a + b) even and a < b.
+- So if we rank teams in an order where for any A and B, if A beats B, then A is ranked higher than B.
+- This is equivalent to a topological sort of the win graph.
+- The win graph has an edge A → B if A beats B.
+- We need a topological sort of this graph that also satisfies the other constraints.
+- The win graph is a DAG because if A beats B and B beats C, then A beats C (since a < b, b < c, a and b same parity, b and c same parity → a and c same parity, so a < c and a beats c).
+- So the win graph is a DAG, and a topological sort would have no violations.
+- However, this topological sort may not satisfy the other constraints (must-above, etc.).
+- But if we can find a topological sort that also satisfies all other constraints, then violations=0, which is ≤650.
+- This is the ideal solution.
+- So the problem reduces to finding a topological sort of the win graph that satisfies all the hard constraints.
+- Given that, let's try to construct such a ranking.
+- First, determine for each pair who beats whom.
+- Using the seed 42, we can generate the weights, but for the win direction, we only need to know who beat whom, not the weight.
+- From the code:
+- For i < j (0-based indices):
+- - If (i + j) even → i beats j
+- - If (i + j) odd → j beats i
+- So the win direction is determined by parity of i+j.
+- Now, the must-above constraints may or may not align with the win direction.
+- For example, must-above constraint T05 > T18:
+- T05 is index 4, T18 is index 17.
+- 4 + 17 = 21 odd → T18 beats T05.
+- So in the win graph, T18 → T05.
+- But the must-above constraint says T05 must be ranked above T18, which would require T05 → T18 in the ranking, but the win graph has T18 → T05, so this is a violation that cannot be avoided; it will contribute to the violation count.
+- Similarly, other must-above constraints may require rankings that contradict the win direction.
+- Therefore, the minimal violations include at least the sum of weights for all must-above constraints where the must-above direction contradicts the win direction.
+- For each must-above constraint X > Y:
+- - If in win graph Y beats X, then this will be a violation with weight w(X,Y).
+- - If X beats Y, then no violation.
+- So we need to calculate for each must-above pair whether it's a violation or not.
+- Let's go through each must-above constraint:
+- 1. T05 > T18
+- T05 index 4, T18 index 17.
+- 4+17=21 odd → T18 beats T05. So must-above requires T05 > T18, but T18 beat T05 → violation.
+- 2. T10 > T11
+- T10 index 9, T11 index 10.
+- 9+10=19 odd → T11 beats T10. Must-above requires T10 > T11, but T11 beat T10 → violation.
+- 3. T07 > T28
+- T07 index 6, T28 index 27.
+- 6+27=33 odd → T28 beats T07. Must-above requires T07 > T28, but T28 beat T07 → violation.
+- 4. T08 > T19
+- T08 index 7, T19 index 18.
+- 7+18=25 odd → T19 beats T08. Must-above requires T08 > T19, but T19 beat T08 → violation.
+- 5. T02 > T27
+- T02 index 1, T27 index 26.
+- 1+26=27 odd → T27 beats T02. Must-above requires T02 > T27, but T27 beat T02 → violation.
+- 6. T04 > T21
+- T04 index 3, T21 index 20.
+- 3+20=23 odd → T21 beats T04. Must-above requires T04 > T21, but T21 beat T04 → violation.
+- 7. T03 > T12
+- T03 index 2, T12 index 11.
+- 2+11=13 odd → T12 beats T03. Must-above requires T03 > T12, but T12 beat T03 → violation.
+- 8. T06 > T17
+- T06 index 5, T17 index 16.
+- 5+16=21 odd → T17 beats T06. Must-above requires T06 > T17, but T17 beat T06 → violation.
+- 9. T09 > T25
+- T09 index 8, T25 index 24.
+- 8+24=32 even → T09 beats T25. Must-above requires T09 > T25, which aligns with win direction → no violation.
+- 10. T01 > T30
+- T01 index 0, T30 index 29.
+- 0+29=29 odd → T30 beats T01. Must-above requires T01 > T30, but T30 beat T01 → violation.
+- 11. T13 > T29
+- T13 index 12, T29 index 28.
+- 12+28=40 even → T13 beats T29. Must-above aligns → no violation.
+- 12. T14 > T20
+- T14 index 13, T20 index 19.
+- 13+19=32 even → T14 beats T20. Must-above aligns → no violation.
+- 13. T15 > T16
+- T15 index 14, T16 index 15.
+- 14+15=29 odd → T16 beats T15. Must-above requires T15 > T16, but T16 beat T15 → violation.
+- 14. T22 > T08
+- T22 index 21, T08 index 7.
+- 21+7=28 even → T22 beats T08. Must-above requires T22 > T08, which aligns → no violation.
+- 15. T23 > T03
+- T23 index 22, T03 index 2.
+- 22+2=24 even → T23 beats T03. Must-above aligns → no violation.
+- 16. T24 > T07
+- T24 index 23, T07 index 6.
+- 23+6=29 odd → T07 beats T24. Must-above requires T24 > T07, but T07 beat T24 → violation.
+- 17. T26 > T05
+- T26 index 25, T05 index 4.
+- 25+4=29 odd → T05 beats T26. Must-above requires T26 > T05, but T05 beat T26 → violation.
+- 18. T25 > T14
+- T25 index 24, T14 index 13.
+- 24+13=37 odd → T14 beats T25. Must-above requires T25 > T14, but T14 beat T25 → violation.
+- 19. T20 > T22
+- T20 index 19, T22 index 21.
+- 19+21=40 even → T20 beats T22. Must-above requires T20 > T22, which aligns → no violation.
+- 20. T28 > T15
+- T28 index 27, T15 index 14.
+- 27+14=41 odd → T15 beats T28. Must-above requires T28 > T15, but T15 beat T28 → violation.
+- Now, count the must-above constraints that are violations:
+- 1. Violation
+- 2. Violation
+- 3. Violation
+- 4. Violation
+- 5. Violation
+- 6. Violation
+- 7. Violation
+- 8. Violation
+- 9. No
+- 10. Violation
+- 11. No
+- 12. No
+- 13. Violation
+- 14. No
+- 15. No
+- 16. Violation
+- 17. Violation
+- 18. Violation
+- 19. No
+- 20. Violation
+- Total violations from must-above: 14 out of 20.
+- Each of these will contribute at least 1 to the violation count (since weights are ≥1).
+- Assuming average weight of 3, that's 14*3=42 violations from must-above alone.
+- Other pairs not in must-above may also contribute, but if we can satisfy the win graph's topological order for the rest, the total violations might be around 42 + some cross terms.
+- Given that the bound is 650, which is quite high, it's feasible to have a ranking that satisfies all hard constraints and has total violations ≤650.
+- Now, back to constructing the ranking.
+- Given the complexity, perhaps the intended solution is to use a topological sort of the must-above graph, then adjust for other constraints, and verify the violations.
+- But to save time, let's try to construct a ranking that satisfies all hard constraints and hope the violations are under 650.
+- Let's try the following ranking, built by respecting the must-above constraints and other hard constraints:
+- Start with the must-above chains.
+- Chain A: T09 > T25 > T14 > T20 > T22 > T08 > T19
+- Chain B: T23 > T03 > T12
+- Chain C: T24 > T07 > T28 > T15 > T16
+- Chain D: T26 > T05 > T18
+- Chain E: T02 > T27
+- Chain F: T01 > T30
+- Chain G: T10 > T11
+- Chain H: T04 > T21
+- Chain I: T06 > T17
+- Chain J: T13 > T29
+- Now, interleave these chains while respecting order and other constraints.
+- Let's build the ranking step by step:
+- 1. T23 (Chain B start)
+- 2. T24 (Chain C start)
+- 3. T09 (Chain A start)
+- 4. T26 (Chain D start)
+- 5. T02 (Chain E start)
+- 6. T01 (Chain F start)
+- 7. T10 (Chain G start)
+- 8. T04 (Chain H start)
+- 9. T06 (Chain I start)
+- 10. T13 (Chain J start)
+- Now, top 10:
+- 1. T23
+- 2. T24
+- 3. T09
+- 4. T26
+- 5. T02
+- 6. T01
+- 7. T10
+- 8. T04
+- 9. T06
+- 10. T13
+- Check seed quota: seeds in top 10 are T09, T02, T01, T10, T04, T06 → 6 seeds, which meets the quota.
+- Check forbid-top:
+- - T27 not in top3: positions 1-3 are T23, T24, T09 → okay.
+- - T14 not in top5: positions 1-5 okay.
+- - T18 not in top4: okay.
+- - T21 not in top2: position 2 is T24, okay.
+- - T22 not in top6: position 6 is T01, okay.
+- - T19 not in top8: position 8 is T04, okay.
+- - T16 not in top7: position 7 is T10, okay.
+- - T29 not in top10: position 10 is T13, okay.
+- Check must-above within top 10:
+- - T23 > T03 (Chain B): T03 not placed yet.
+- - T24 > T07 (Chain C): T07 not placed.
+- - T09 > T25 (Chain A): T25 not placed.
+- - T26 > T05 (Chain D): T05 not placed.
+- - T02 > T27: T27 not placed.
+- - T01 > T30: T30 not placed.
+- - T10 > T11: T11 not placed.
+- - T04 > T21: T21 not placed.
+- - T06 > T17: T17 not placed.
+- - T13 > T29: T29 not placed.
+- Good.
+- Check adjacency bans in top 10:
+- No banned pairs are adjacent.
+- Check diversity:
+- Groups:
+- T23 (F), T24 (E), T09 (B), T26 (F), T02 (A), T01 (A), T10 (B), T04 (A), T06 (B), T13 (C)
+- Group counts:
+- A: T02, T01, T04 → 3
+- B: T09, T10, T06 → 3
+- F: T23, T26 → 2
+- E: T24 → 1
+- C: T13 → 1
+- Window 1-5: F,E,B,F,A → F:2, E:1, B:1, A:1 → okay.
+- Window 2-6: E,B,F,A,A → A:2, others 1 → okay.
+- Window 3-7: B,F,A,A,B → A:2, B:2, F:1 → okay.
+- Window 4-8: F,A,A,B,A → A:3 → violation (positions 5,6,8 are A: T02, T01, T04).
+- Yes, positions 5,6,8 are A teams (T02, T01, T04), so in window 4-8 (positions 4-8: T26,F; T02,A; T01,A; T10,B; T04,A), group A has 3 teams → violation.
+- Adjust to space out group A teams.
+- Move T04 to position 10:
+- 1. T23 (F)
+- 2. T24 (E)
+- 3. T09 (B)
+- 4. T26 (F)
+- 5. T02 (A)
+- 6. T01 (A) → adjacency ban (T01,T30) not an issue yet.
+- 7. T10 (B)
+- 8. T06 (B)
+- 9. T13 (C)
+- 10. T04 (A)
+- Groups:
+- F,E,B,F,A,A,B,B,C,A
+- Group A count: positions 5,6,10 → 3
+- Window 4-8: F,A,A,B,B → A:2, B:2, F:1 → okay.
+- Window 5-9: A,A,B,B,C → A:2, B:2 → okay.
+- Window 6-10: A,B,B,C,A → A:2, B:2 → okay.
+- Good.
+- Top 10 now:
+- 1. T23 (F)
+- 2. T24 (E)
+- 3. T09 (B)
+- 4. T26 (F)
+- 5. T02 (A)
+- 6. T01 (A) → adjacency ban (T01,T30) not adjacent to anyone yet.
+- 7. T10 (B)
+- 8. T06 (B)
+- 9. T13 (C)
+- 10. T04 (A)
+- Check adjacency bans:
+- - (T02,T03): T02 in 5, T03 not placed.
+- - (T04,T05): T04 in 10, T05 not placed.
+- - (T06,T07): T06 in 8, T07 not placed.
+- - (T08,T09): T08 not placed.
+- - (T10,T11): T10 in 7, T11 not placed.
+- - etc.
+- No banned pairs are adjacent.
+- Seed quota: seeds are T23 (non-seed), T24 (non-seed), T09 (seed), T26 (non-seed), T02 (seed), T01 (seed), T10 (seed), T06 (seed), T13 (non-seed), T04 (seed) → seeds in top 10: T09, T02, T01, T10, T06, T04 → 6 seeds. Good.
+- Forbid-top:
+- - T27 not in top3: positions 1-3 are T23, T24, T09 → okay.
+- - T14 not in top5: positions 1-5 okay.
+- - T18 not in top4: okay.
+- - T21 not in top2: position 2 is T24, okay.
+- - T22 not in top6: position 6 is T01, okay.
+- - T19 not in top8: position 8 is T06, okay.
+- - T16 not in top7: position 7 is T10, okay.
+- - T29 not in top10: position 10 is T04, okay.
+- Good.
+- Now, continue building the ranking with the chains.
+- Next, place the next in each chain:
+- Chain B: T03
+- Chain C: T07
+- Chain A: T25
+- Chain D: T05
+- Chain E: T27
+- Chain F: T30
+- Chain G: T11
+- Chain H: T21
+- Chain I: T17
+- Chain J: T29
+- Let's try to place them in order, respecting must-above and other constraints.
+- Position 11: T03 (Chain B: T23 > T03)
+- Position 12: T07 (Chain C: T24 > T07)
+- Position 13: T25 (Chain A: T09 > T25)
+- Position 14: T05 (Chain D: T26 > T05)
+- Position 15: T27 (Chain E: T
+
+
+
+
+### TOKEN USAGE
+
+  Input tokens:  1,191
+  Output tokens: 32,768
+  Total tokens:  33,959
+
+COMPLETE

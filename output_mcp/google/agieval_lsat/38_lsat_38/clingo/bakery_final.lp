@@ -1,0 +1,44 @@
+% Days and Types
+day(mon; tue; wed; thu; fri).
+type(oatmeal; peanut_butter; sugar).
+batch(Type, 1..3) :- type(Type).
+
+% Each batch is made on a single day
+1 { made(Type, Batch, Day) : day(Day) } 1 :- batch(Type, Batch).
+
+% No two batches of the same kind on the same day
+:- made(Type, B1, Day), made(Type, B2, Day), B1 != B2.
+
+% At least one batch on Monday
+:- not 1 { made(Type, Batch, mon) : batch(Type, Batch) }.
+
+% The second batch of oatmeal cookies is made on the same day as the first batch of peanut butter cookies
+made(oatmeal, 2, Day) :- made(peanut_butter, 1, Day).
+made(peanut_butter, 1, Day) :- made(oatmeal, 2, Day).
+
+% The second batch of sugar cookies is made on Thursday
+made(sugar, 2, thu).
+
+% Count batches per day
+batches_on_day(Day, N) :- day(Day), N = #count { Type, Batch : made(Type, Batch, Day) }.
+
+% A day has at most two batches if N <= 2
+at_most_two(Day) :- batches_on_day(Day, N), N <= 2.
+
+% A day "could" have at most two batches if there exists a model where at_most_two(Day) is true.
+% We use a helper to collect all days that satisfy this in at least one model.
+could_have_at_most_two(Day) :- day(Day), at_most_two(Day).
+
+% Count how many such days exist.
+% Since we want to know how many days *could* have at most two batches,
+% we look at the set of all days that satisfy this in at least one model.
+count_possible_days(N) :- N = #count { D : could_have_at_most_two(D) }.
+
+% Map to answer choices
+option(a) :- count_possible_days(1).
+option(b) :- count_possible_days(2).
+option(c) :- count_possible_days(3).
+option(d) :- count_possible_days(4).
+option(e) :- count_possible_days(5).
+
+#show option/1.

@@ -1,0 +1,45 @@
+# Benchmark Report (SELECTOR): FOLIO - story_306_ex_84
+
+**Provider:** mistral2
+**Model:** mistral-small-2603
+**Config:** max_output_tokens: 32768, temperature: 0.0, top_p: 1.0, seed: 42, reasoning_enabled: True, reasoning_effort: none
+**Duration:** 0.65s
+
+
+ SELECTOR META EVALUATOR AGENT
+
+ Query: Premises:
+If a restaurant is listed in Yelp’s recommendations, then the restaurant has not received many negative reviews.
+All restaurants with a rating greater than four are listed in Yelp’s recommendations.
+Some restaurants that do not provide take-out service receive many negative reviews.
+All restaurants that are popular among local residents have ratings greater than four.
+The Hamden Plaza Subway store has a rating greater than four, or it is popular among local residents.
+
+Conclusion:
+If the Hamden Plaza Subway store provides take-out service and receives many negative reviews, then its rating is greater than 4 and it does not provide take-out service.
+
+Is the conclusion True, False, or Uncertain?
+
+```json
+{
+    "solver_ranking": ["VAMPIRE", "Z3", "CLINGO"]
+}
+```
+
+### TOKEN USAGE
+
+  Input tokens:  1,343
+  Output tokens: 29
+  Total tokens:  1,372
+
+COMPLETE
+
+## Selector Final Answer
+
+```json
+```json
+{
+    "solver_ranking": ["VAMPIRE", "Z3", "CLINGO"]
+}
+```
+```

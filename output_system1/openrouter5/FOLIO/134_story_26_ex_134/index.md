@@ -1,0 +1,58 @@
+# Benchmark Report (SYSTEM1): FOLIO - story_26_ex_134
+
+**Provider:** openrouter5
+**Model:** deepseek/deepseek-v4-flash
+**Config:** max_output_tokens: 32768, temperature: 0.0, top_p: 1.0, seed: 42, reasoning_enabled: False, reasoning_effort: none
+**Duration:** 2.86s
+
+
+ SYSTEM 1 PURE REASONING AGENT
+
+ Query: Consider the following logical premises:
+Some mammals have teeth.
+Platypuses have no teeth.
+Platypuses are mammals. 
+Humans have teeth.
+
+Conclusion to evaluate:
+Humans are mammals.
+
+Question: Based STRICTLY on the premises, is the conclusion True, False, or Uncertain?
+Return your final answer in JSON format like this: {"Conclusion": "True or False or Uncertain in here"}
+
+
+We know from the premises:
+- Some mammals have teeth.
+- Platypuses have no teeth.
+- Platypuses are mammals.
+- Humans have teeth.
+
+The premises do not state that all mammals have teeth, nor do they state that having teeth means being a mammal. The fact that humans have teeth and some mammals have teeth does not logically force the conclusion that humans are mammals based only on these statements.
+
+Thus, the conclusion "Humans are mammals" is **Uncertain**.
+
+{"Conclusion": "Uncertain"}
+
+### TOKEN USAGE
+
+  Input tokens:  131
+  Output tokens: 104
+  Total tokens:  235
+
+COMPLETE
+
+## System 1 Final Answer
+
+```json
+We know from the premises:
+- Some mammals have teeth.
+- Platypuses have no teeth.
+- Platypuses are mammals.
+- Humans have teeth.
+
+The premises do not state that all mammals have teeth, nor do they state that having teeth means being a mammal. The fact that humans have teeth and some mammals have teeth does not logically force the conclusion that humans are mammals based only on these statements.
+
+Thus, the conclusion "Humans are mammals" is **Uncertain**.
+
+{"Conclusion": "Uncertain"}
+```

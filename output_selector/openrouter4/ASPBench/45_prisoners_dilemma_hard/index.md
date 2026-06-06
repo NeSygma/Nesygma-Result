@@ -1,0 +1,95 @@
+# Benchmark Report (SELECTOR): ASPBench - 45_prisoners_dilemma_hard
+
+**Provider:** openrouter4
+**Model:** deepseek/deepseek-v4-flash
+**Config:** max_output_tokens: 32768, temperature: 0.0, top_p: 1.0, seed: 42, reasoning_enabled: True, reasoning_effort: high
+**Duration:** 7.66s
+
+
+ SELECTOR META EVALUATOR AGENT
+
+ Query: # Problem Statement
+
+You are a player ("Ego") entering a 2-round Prisoners' Dilemma tournament. You must choose a single, fixed strategy to play for the entire tournament. Your opponents are drawn from a known pool with a fixed distribution of strategies. Determine which of your available strategies will yield the highest total expected score when played against the entire pool of opponents.
+
+## Instance Data
+
+**Rounds per game:** 2
+
+**Ego's available strategies:** `COOP`, `DEFECT`, `TFT`
+
+**Opponent Pool Composition (10 opponents total):**
+- 5 opponents use strategy `type_A`
+- 3 opponents use strategy `type_B`
+- 2 opponents use strategy `type_C`
+
+**Payoff Matrix (for Ego):**
+- You Cooperate, Opponent Cooperates: 3 points
+- You Defect, Opponent Cooperates: 5 points
+- You Cooperate, Opponent Defects: 0 points
+- You Defect, Opponent Defects: 1 point
+
+**Strategy Definitions:**
+- `COOP` (Ego): Always Cooperate ('C')
+- `DEFECT` (Ego): Always Defect ('D')
+- `TFT` (Ego): Play 'C' in round 1, then copy the opponent's move from the previous round
+- `type_A` (Opponent): Always Defect ('D')
+- `type_B` (Opponent): Tit-for-Tat. Plays 'C' in round 1, then copies Ego's move from the previous round
+- `type_C` (Opponent): Forgiving Tit-for-Tat. Plays 'C' in round 1 and also plays 'C' in round 2, regardless of Ego's round 1 move
+
+## Constraints
+
+1. **Single Strategy Selection**: Ego must choose exactly one strategy for the entire tournament
+2. **Fixed Opponent Pool**: The distribution of opponent strategies is fixed (5 type_A, 3 type_B, 2 type_C)
+3. **Deterministic Strategies**: All strategies are deterministic and follow their defined behavior
+4. **Round Structure**: Each game consists of exactly 2 rounds
+5. **Score Calculation**: Expected total score is the sum of scores from all matchups weighted by opponent count
+
+## Objective
+
+Find a solution that **maximizes** the expected total score across all matchups with the opponent pool.
+
+**Expected optimal:** strategy=DEFECT, score=48
+
+### Field Descriptions
+
+- `best_strategy_choice`: String value representing the optimal strategy choice (one of "COOP", "DEFECT", "TFT")
+- `expected_scores`: Array of objects, each containing:
+  - `strategy`: String name of the strategy
+  - `expected_total_score`: Integer total expected score for that strategy
+  - Array must be sorted in descending order by score
+
+
+### Thinking
+
+- We need to analyze the problem. The problem is about selecting a strategy that maximizes expected total score in a 2-round Prisoners' Dilemma tournament with known opponent distribution. The strategies are deterministic. This involves computing expected scores for each strategy against the opponent pool. This is a straightforward calculation: for each opponent type, compute the score per game (2 rounds) given Ego's strategy and opponent's strategy, then multiply by number of opponents of that type, sum. This is essentially arithmetic with some conditional logic based on strategy definitions.
+- Which solver is most suitable? Let's consider:
+- - VAMPIRE: First-order logic, good for entailment with quantifiers. This problem doesn't involve logical entailment, universal/existential quantifiers, or categorical reasoning. It's a numeric optimization problem. Not suitable.
+- - CLINGO: Answer set programming, good for combinatorial search, rule-based inference, planning. But here we have a small set of strategies (3), each with deterministic outcomes. We could model the problem in Clingo, but it's overkill. The problem is essentially arithmetic: compute for each strategy the total score. Clingo can handle arithmetic with #sum, but it's not the best fit because there's no search or planning. However, it could work.
+- - Z3: SMT solver, good for constraint satisfaction with arithmetic, optimization. This problem involves computing numeric scores, can be modeled with integer arithmetic and then maximize. Z3 can directly handle optimization over integer variables. It's straightforward to encode: define scores for each matchup, sum over opponents, and find max. Z3 is well-suited for such optimization with arithmetic.
+- Given the problem is essentially a simple arithmetic optimization, Z3 is the most suitable because it directly handles numbers and optimization. Clingo could also do it but is more oriented towards logic programming and search. VAMPIRE is not suited.
+- Thus ranking: Z3 most suitable, then CLINGO, then VAMPIRE.
+- But note: the problem says "Find a solution that maximizes the expected total score" and gives expected optimal. So we need to compute. Z3 is perfect for that.
+- So output: {"solver_ranking": ["Z3", "CLINGO", "VAMPIRE"]}
+- Now, ensure we follow format exactly: JSON with key "solver_ranking" and value list of three strings in order.
+
+
+{
+    "solver_ranking": ["Z3", "CLINGO", "VAMPIRE"]
+}
+
+### TOKEN USAGE
+
+  Input tokens:  1,781
+  Output tokens: 515
+  Total tokens:  2,296
+
+COMPLETE
+
+## Selector Final Answer
+
+```json
+{
+    "solver_ranking": ["Z3", "CLINGO", "VAMPIRE"]
+}
+```

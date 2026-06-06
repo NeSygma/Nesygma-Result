@@ -1,0 +1,10 @@
+% Positive run: original conclusion as conjecture
+fof(premise1, axiom, ! [X] : ((rabbit(X) & spotted(X)) => cute(X))).
+fof(premise2, axiom, ? [X] : (turtle(X) & spotted(X))).
+fof(premise3, axiom, ! [X] : (spotted(X) => (rabbit(X) | squirrel(X)))).
+fof(premise4, axiom, ! [X] : (skittish(X) => ~calm(X))).
+fof(premise5, axiom, ! [X] : ((squirrel(X) & spotted(X)) => skittish(X))).
+fof(premise6, axiom, (spotted(rockie) & calm(rockie))).
+
+% Conclusion: If Rockie is not both a turtle and a squirrel, then Rockie is either cute or skittish.
+fof(conclusion, conjecture, (~(turtle(rockie) & squirrel(rockie)) => (cute(rockie) | skittish(rockie)))).

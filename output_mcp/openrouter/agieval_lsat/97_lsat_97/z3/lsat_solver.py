@@ -1,0 +1,43 @@
+from z3 import *
+
+solver = Solver()
+# Variables for positions 1..7
+houses = ['J','K','L','M','N','O','P']
+pos = {h: Int(f'pos_{h}') for h in houses}
+# Domain constraints
+for h in houses:
+    solver.add(pos[h] >= 1, pos[h] <= 7)
+# All distinct
+solver.add(Distinct([pos[h] for h in houses]))
+# Base constraints
+solver.add(Or(pos['J'] == 6, pos['J'] == 7))  # J in evening
+solver.add(Not(Or(pos['K'] == 1, pos['K'] == 2)))  # K not in morning
+solver.add(pos['L'] > pos['K'])
+solver.add(pos['L'] < pos['M'])
+# P in afternoon
+solver.add(Or(pos['P'] == 3, pos['P'] == 4, pos['P'] == 5))
+
+# Define option constraints
+opt_a = (pos['J'] == 7)
+opt_b = (pos['K'] == 3)
+opt_c = (pos['N'] == 1)
+opt_d = Or(pos['M'] == 3, pos['M'] == 4, pos['M'] == 5)
+opt_e = Or(pos['O'] == 1, pos['O'] == 2)
+
+found_options = []
+for letter, constr in [("A", opt_a), ("B", opt_b), ("C", opt_c), ("D", opt_d), ("E", opt_e)]:
+    solver.push()
+    solver.add(constr)
+    if solver.check() == sat:
+        found_options.append(letter)
+    solver.pop()
+
+if len(found_options) == 1:
+    print("STATUS: sat")
+    print(f"answer:{found_options[0]}")
+elif len(found_options) > 1:
+    print("STATUS: unsat")
+    print(f"Refine: Multiple options found {found_options}")
+else:
+    print("STATUS: unsat")
+    print("Refine: No options found")

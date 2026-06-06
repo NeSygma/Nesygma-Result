@@ -1,0 +1,1 @@
+fof(prem1, axiom, ? [X] : (affection(X) & love(X))).\nfof(prem2, axiom, ? [X] : (love(X) & positive(X))).\nfof(conclusion, conjecture, ? [X] : (affection(X) & positive(X))).

@@ -1,0 +1,32 @@
+# Benchmark Report (SELECTOR): agieval_lsat - lsat_13
+
+**Provider:** openrouter5
+**Model:** deepseek/deepseek-v4-flash
+**Config:** max_output_tokens: 32768, temperature: 0.0, top_p: 1.0, seed: 42, reasoning_enabled: False, reasoning_effort: none
+**Duration:** 1.75s
+
+
+ SELECTOR META EVALUATOR AGENT
+
+ Query: At a concert, exactly eight compositions—F, H, L, O, P, R, S, and T—are to be performed exactly once each, consecutively and one composition at a time. The order of their performance must satisfy the following conditions: T is performed either immediately before F or immediately after R. At least two compositions are performed either after F and before R, or after R and before F. O is performed either first or fifth. The eighth composition performed is either L or H. P is performed at some time before S. At least one composition is performed either after O and before S, or after S and before O.Q: P CANNOT be performed Answer Choices: (A)second (B)third (C)fourth (D)sixth (E)seventh
+A: Among A through E, the answer is
+
+{
+    "solver_ranking": ["Z3", "CLINGO", "VAMPIRE"]
+}
+
+### TOKEN USAGE
+
+  Input tokens:  1,351
+  Output tokens: 24
+  Total tokens:  1,375
+
+COMPLETE
+
+## Selector Final Answer
+
+```json
+{
+    "solver_ranking": ["Z3", "CLINGO", "VAMPIRE"]
+}
+```

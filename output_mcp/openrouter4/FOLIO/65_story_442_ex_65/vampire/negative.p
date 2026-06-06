@@ -1,0 +1,6 @@
+fof(premise1, axiom, ! [X] : (brown_swiss_cattle(X) => cow(X))).
+fof(premise2, axiom, ? [X] : (pet(X) & brown_swiss_cattle(X))).
+fof(premise3, axiom, ! [X] : (cow(X) => domesticated_animal(X))).
+fof(premise4, axiom, ! [X] : (alligator(X) => ~domesticated_animal(X))).
+fof(premise5, axiom, alligator(ted)).
+fof(goal_neg, conjecture, ~(brown_swiss_cattle(ted) => ~pet(ted))).

@@ -1,0 +1,1 @@
+fof(neg_conjecture, conjecture, ~excessive_erotic_violent_content(hachi) & ~in_frozen_series(hachi)).

@@ -1,0 +1,1 @@
+tff(deposit_type, type, deposit: $i -> $int).\ntff(rent_type, type, rent: $i -> $int).\ntff(axiom_deposit_ge_rent, axiom, ! [B: $i] : $lesseq(rent(B), deposit(B))).\ntff(axiom_rent_olive_garden, axiom, rent(olive_garden) = 2000).\ntff(axiom_2000_more_than_1500, axiom, $gtr(2000,1500)).\ntff(conjecture_security_deposit, conjecture, $lesseq(2000, deposit(olive_garden)).

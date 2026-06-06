@@ -1,0 +1,1 @@
+fof(axiom_1, axiom, managed_building(olive_garden)). fof(axiom_2, axiom, allows_pets(olive_garden)). fof(axiom_3, axiom, ! [B] : (allows_pets(B) => allowed_move_in(tom, B, fluffy))). fof(conjecture, conjecture, allowed_move_in(tom, olive_garden, fluffy)).

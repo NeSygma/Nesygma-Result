@@ -1,0 +1,1 @@
+fof(axiom_happy_or_sad, axiom, ! [X] : (happy(X) | sad(X))).\nfof(axiom_not_both, axiom, ! [X] : (~(happy(X) & sad(X)))).\nfof(at_least_one_happy, axiom, ? [X] : (happy(X))).\nfof(conjecture, conjecture, ? [X] : (~ (sad(X)))).

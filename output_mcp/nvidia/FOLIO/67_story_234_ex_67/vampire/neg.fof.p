@@ -1,0 +1,19 @@
+fof(axiom_private, axiom, private(yale)).
+fof(axiom_ivyleague, axiom, ivyleague(yale)).
+fof(axiom_research, axiom, research(yale)).
+fof(axiom_moved, axiom, moved(yale, new_haven)).
+fof(axiom_endowment, axiom, endowment(yale)).
+fof(college_benjamin_franklin, axiom, college(benjamin_franklin)).
+fof(college_berkeley, axiom, college(berkeley)).
+fof(college_branford, axiom, college(branford)).
+fof(college_davenport, axiom, college(davenport)).
+fof(college_ezra_stiles, axiom, college(ezra_stiles)).
+fof(college_grace_hopper, axiom, college(grace_hopper)).
+fof(college_jonathan_edwards, axiom, college(jonathan_edwards)).
+fof(college_morse, axiom, college(morse)).
+fof(college_pauli_murray, axiom, college(pauli_murray)).
+fof(college_pierson, axiom, college(pierson)).
+fof(college_silliman, axiom, college(silliman)).
+fof(college_timothy_dwight, axiom, college(timothy_dwight)).
+fof(college_trumbull, axiom, college(trumbull)).
+fof(goal, conjecture, ~largest_endowment(yale)).

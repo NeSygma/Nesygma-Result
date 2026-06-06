@@ -1,0 +1,47 @@
+# Benchmark Report (SELECTOR): FOLIO - story_459_ex_196
+
+**Provider:** mistral2
+**Model:** mistral-small-2603
+**Config:** max_output_tokens: 32768, temperature: 0.0, top_p: 1.0, seed: 42, reasoning_enabled: True, reasoning_effort: none
+**Duration:** 0.79s
+
+
+ SELECTOR META EVALUATOR AGENT
+
+ Query: Premises:
+Jane does not like any animals that bark.
+All dogs are animals that bark.
+Jane likes all animals that jump.
+If an animal has legs, then it jumps.
+If an animal is terricolous, then it has legs. 
+KiKi is an animal.
+If KiKi neither jumps nor has legs, then KiKi is terricolous or has legs.
+
+Conclusion:
+KiKi is terricolous.
+
+Is the conclusion True, False, or Uncertain?
+
+```json
+{
+    "solver_ranking": ["VAMPIRE", "Z3", "CLINGO"]
+}
+```
+
+### TOKEN USAGE
+
+  Input tokens:  1,303
+  Output tokens: 29
+  Total tokens:  1,332
+
+COMPLETE
+
+## Selector Final Answer
+
+```json
+```json
+{
+    "solver_ranking": ["VAMPIRE", "Z3", "CLINGO"]
+}
+```
+```

@@ -1,0 +1,1 @@
+fof(conjecture, conjecture, ~rated_ga(hachi_dog_s_tale)).

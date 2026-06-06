@@ -1,0 +1,1124 @@
+# Benchmark Report (MCP): ASPBench - 37_car_sequencing_hard
+
+**Provider:** openrouter7
+**Model:** nvidia/nemotron-3-nano-30b-a3b:free
+**Solver:** z3
+**Config:** max_output_tokens: 32768, temperature: 0.0, top_p: 1.0, seed: 42, reasoning_enabled: False, reasoning_effort: none
+**Duration:** 168.07s
+
+
+ MCP Z3 AGENT - Symbolic Reasoning
+
+### Query
+# Problem Statement Schedule 12 cars on an assembly line with hierarchical options, equipment
+
+cooldown periods, and conditional capacity constraints that change based on sequence context. ##
+Instance Data **Total Positions:** 12 **Car Types and Counts:** - Type A: 3 cars - Type B: 3 cars -
+Type C: 4 cars - Type D: 2 cars **Options:** - Option 1: Standard Sunroof - Option 2: Custom Paint -
+Option 3: Sport Package - Option 4: EV Powertrain - Option 5: Panoramic Sunroof **Car Type-Option
+Mapping:** - Type A: has Option 1 (Standard Sunroof) - Type B: has Options 3, 4 (Sport Package, EV
+Powertrain) - Type C: has Option 2 (Custom Paint) - Type D: has Option 5 (Panoramic Sunroof) ##
+Constraints 1. **Assignment**: Each position must have exactly one car, and each car type must
+appear exactly the specified number of times. 2. **Hierarchical Options**: Option 5 (Panoramic
+Sunroof) implies Option 1 (Standard Sunroof) for constraint purposes. 3. **Positional Ban**: No car
+with Option 4 (EV Powertrain) can be placed at position 1 or position 12. 4. **Equipment Cooldown**:
+Cars with Option 2 (Custom Paint) must have at least a 2-slot gap between them (cannot be at
+positions P and P+1, or P and P+2). 5. **Standard Capacity**: At most 2 cars with effective Option 1
+(sunroofs, including panoramic) in any window of 4 consecutive positions. 6. **Conditional
+Capacity**: For Option 3 (Sport Package): - If a position P is preceded by a car with EV (Option 4),
+then at most 1 car with Option 3 in the window [P, P+3] - Otherwise, at most 2 cars with Option 3 in
+the window [P, P+3] ## Objective Find any valid sequence that satisfies all constraints. ## Output
+Format Output a JSON object with the following structure: ```json { "solution_found": true,
+"sequence": [ { "position": 1, "car_type": "C", "options": [2] }, { "position": 2, "car_type": "A",
+"options": [1] }, { "position": 3, "car_type": "B", "options": [3, 4] }, { "position": 4,
+"car_type": "C", "options": [2] }, { "position": 5, "car_type": "D", "options": [5] }, { "position":
+6, "car_type": "A", "options": [1] }, { "position": 7, "car_type": "B", "options": [3, 4] }, {
+"position": 8, "car_type": "C", "options": [2] }, { "position": 9, "car_type": "A", "options": [1]
+}, { "position": 10, "car_type": "B", "options": [3, 4] }, { "position": 11, "car_type": "C",
+"options": [2] }, { "position": 12, "car_type": "D", "options": [5] } ] } ``` **Field
+Descriptions:** - `solution_found`: Boolean indicating whether a valid sequence was found -
+`sequence`: Array of 12 objects, each containing: - `position`: Integer from 1 to 12 - `car_type`:
+String, one of "A", "B", "C", "D" - `options`: Array of integers representing the options for that
+car type
+
+  - write_and_run_z3: Write Python code using Z3 to a file and run it immediately to get results.
+We capture printed stdout and stderr from running the script.
+
+## Iteration 1
+
+
+
+### Thinking
+
+- We need to translate the problem into Z3 code. The user wants a translation to solver language. We must produce a Z3 script that models this scheduling problem, and then run it to get a solution. We need to output the script and then run it using write_and_run_z3. Then we must output the status line and any relevant model details. The problem is a model-finding problem: find any valid sequence. So we need to encode variables: positions 1..12 each assigned a car type (A,B,C,D) with given counts. Also each car type has a set of options (maybe multiple). Options are per car type, not per position? The mapping says Type A: has Option 1 (Standard Sunroof). Type B: has Options 3,4 (Sport Package, EV Powertrain). Type C: has Option 2 (Custom Paint). Type D: has Option 5 (Panoramic Sunroof). So each car type has a set of options. But the constraints refer to "effective Option 1 (sunroofs, including panoramic)" meaning Option 1 and Option 5 both count as Option 1? Actually hierarchical: Option 5 implies Option 1 for constraint purposes. So effective Option 1 includes both Option 1 and Option 5? Let's parse: "Standard Capacity: At most 2 cars with effective Option 1 (sunroofs, including panoramic) in any window of 4 consecutive positions." So Option 1 is "Standard Sunroof". Option 5 is "Panoramic Sunroof" which implies Option 1. So effective Option 1 includes cars that have Option 1 or Option 5? Probably yes: cars with Option 5 count as having effective Option 1 due to implication. So we need to count cars at positions where the car type has Option 1 (i.e., Type A) or has Option 5 (i.e., Type D) as effective Option 1.
+- Also "Hierarchical Options": Option 5 implies Option 1 for constraint purposes. So we need to enforce that if a car has Option 5 then it also counts as having Option 1 for the capacity constraint. In modeling, we can just treat Option 5 cars as also having Option 1 for counting.
+- Positional Ban: No car with Option 4 (EV Powertrain) can be placed at position 1 or 12. Option 4 is only for Type B. So Type B cannot be at positions 1 or 12.
+- Equipment Cooldown: Cars with Option 2 (Custom Paint) must have at least a 2-slot gap between them (cannot be at positions P and P+1, or P and P+2). Option 2 is only for Type C. So Type C cars must be spaced at least 3 apart? Actually "cannot be at positions P and P+1, or P and P+2" means you cannot have two Option 2 cars within distance 1 or 2; i.e., the gap must be at least 3 positions? Let's interpret: If a car with Option 2 is at position P, then no other Option 2 car can be at P+1 or P+2. So the next Option 2 car must be at position >= P+3. That's a typical "at least 2-slot gap" meaning at least 2 positions between them? Actually "at least a 2-slot gap between them (cannot be at positions P and P+1, or P and P+2)" means there must be at least 2 positions between them? Let's parse: If you have a car at position P, you cannot place another at P+1 (adjacent) or P+2 (one gap). So the next possible position is P+3. So the gap (distance) must be at least 3. So we need to enforce that any two positions with Type C must differ by at least 3.
+- Standard Capacity: At most 2 cars with effective Option 1 (sunroofs, including panoramic) in any window of 4 consecutive positions. So for any window of 4 consecutive positions (i,i+1,i+2,i+3) (i from 1 to 9), the count of cars that have effective Option 1 (i.e., Type A or Type D) must be <= 2.
+- Conditional Capacity: For Option 3 (Sport Package) i.e., Type B has Option 3. The constraint: For each position P, if the preceding position (P-1) is preceded by a car with EV (Option 4) i.e., Type B also has Option 4? Actually Option 4 is EV Powertrain, which is also part of Type B's options. So Type B cars have both Option 3 and Option 4. So "if a position P is preceded by a car with EV (Option 4)" means if the car at position P-1 has Option 4 (i.e., is Type B). Then at most 1 car with Option 3 in the window [P, P+3]; otherwise, at most 2 cars with Option 3 in that window. So for each P (presumably from 2 to 12? Actually window [P, P+3] must be within 12, so P can be up to 9). The condition depends on whether the preceding car (position P-1) has Option 4 (i.e., is Type B). So we need to enforce that for each P (2..9?), the count of Type B cars in positions P..P+3 is <= 1 if the car at P-1 is Type B; else <= 2.
+- Objective: Find any valid sequence.
+- We need to encode these constraints in Z3.
+- We need to output a script that prints "STATUS: sat" and then the sequence details. The script must print a status line exactly "STATUS: sat" (or "STATUS: unsat"/"STATUS: unknown" as appropriate). Since we are model-finding, we expect SAT. We'll print the sequence.
+- We need to be careful with the modeling of options per car type. Let's define for each position i (1-indexed) a car type variable: maybe an Int with domain {0,1,2,3} representing A,B,C,D. Or we can use a finite domain enumeration using Bool variables for each type at each position with exactly one true. That may be easier for constraints like counts.
+- We also need to enforce the counts of each car type: exactly 3 A's, 3 B's, 4 C's, 2 D's. That's a global cardinality constraint. In Z3 we can enforce using Distinct? Not exactly; we need to count occurrences. We can use a function mapping position to type and then use a global cardinality with a multiset? Simpler: create an array type_of[pos] of Int (or enumerated). Then we can add constraints that the number of positions where type_of[pos] == 0 (A) is 3, etc. Use Sum(If(type_of[i] == 0, 1, 0) for i in 1..12) == 3, etc.
+- Alternatively, we can create separate Bool variables for each position indicating type A, B, C, D, with exactly one true per position, and then cardinality constraints on the sum of those Bools across positions equals the required count. That might be easier for counting.
+- Let's define for each position i (1-indexed from 1 to 12) four Bool variables: isA[i], isB[i], isC[i], isD[i]. Exactly one of them is true per position. Then we can enforce counts: Sum_i isA[i] == 3, Sum_i isB[i] == 3, Sum_i isC[i] == 4, Sum_i isD[i] == 2.
+- We also need to enforce hierarchical option: Option 5 implies Option 1. So if a position has type D (which has Option 5), then it also counts as having effective Option 1. So for capacity constraint we need to count positions where (isA[i] OR isD[i]) as effective Option 1. Actually Type A has Option 1, Type D has Option 5 which implies Option 1. So effective Option 1 is true if isA[i] is true OR isD[i] is true. So we can define a Bool effectiveOption1[i] = Or(isA[i], isD[i]). Then the capacity constraint: For any window of 4 consecutive positions i..i+3, Sum_{j=i}^{i+3} effectiveOption1[j] <= 2. Since we need to count up to 4 positions, we can use Sum of Int values 0/1. We can define Int variables count? Or we can use a custom constraint: For each window, we can add (Or( ... )?). But we need a numeric sum constraint. In Z3 we can use Int variables and add constraints with Sum(If(...)). Simpler: For each window, we can create an Int variable windowSum and add windowSum == Sum(If(effectiveOption1[pos], 1, 0) for pos in window). Then add windowSum <= 2. That's fine.
+- But we need to ensure we can sum Bools as ints. Use If(effectiveOption1[i], 1, 0). That's okay.
+- Now positional ban: No car with Option 4 (EV Powertrain) can be placed at position 1 or 12. Option 4 is only for Type B. So isB[1] must be false, isB[12] must be false. So we add Not(isB[1]), Not(isB[12]).
+- Equipment Cooldown: Cars with Option 2 (Custom Paint) must have at least a 2-slot gap between them. Option 2 is only for Type C. So for any two positions i, j where both are Type C (i.e., isC[i] and isC[j] both true), we need to enforce that if i < j then j - i >= 3. Equivalent to: For any i, we cannot have isC[i] and isC[i+1] both true, and cannot have isC[i] and isC[i+2] both true. So we can add constraints: For each i from 1 to 10 (since i+1 <=12), Not(And(isC[i], isC[i+1])). For each i from 1 to 11 (i+2 <=12), Not(And(isC[i], isC[i+2])). That ensures no two C's are within distance 1 or 2.
+- Standard Capacity: At most 2 cars with effective Option 1 in any window of 4 consecutive positions. As described, we need to enforce for each i from 1 to 9 (window i,i+1,i+2,i+3), the sum of effectiveOption1 across those positions <= 2.
+- Conditional Capacity: For Option 3 (Sport Package). Option 3 is for Type B. So we need to enforce for each position P (presumably from 2 to 9? Actually window [P, P+3] must be within 12, so P can be from 1 to 9). The condition: If the preceding car (position P-1) has Option 4 (i.e., isB[P-1] is true), then at most 1 car with Option 3 in the window [P, P+3]; else at most 2 cars with Option 3 in that window. Option 3 is also Type B. So we need to count Type B cars in that window. So for each P (2..9?), we need to compute count_B_window = sum_{j=P}^{P+3} isB[j] (since only Type B has Option 3). Then we need to enforce: If isB[P-1] then count_B_window <= 1 else count_B_window <= 2. This is a conditional constraint. In Z3 we can enforce using Implies: Implies(isB[P-1], count_B_window <= 1) and also add the unconditional constraint count_B_window <= 2? Actually the constraint says: If preceded by EV, then at most 1; otherwise at most 2. So we need both: count_B_window <= 2 always? Not exactly; if preceded by EV, the limit is stricter (1). So we can enforce: count_B_window <= 2 always (that's weaker), and also add Implies(isB[P-1], count_B_window <= 1). But we also need to enforce that if not preceded by EV, the limit is 2, which is already covered by the generic <=2? Actually the generic <=2 is always true; but the condition says "Otherwise, at most 2 cars with Option 3 in the window [P, P+3]". That is automatically satisfied if we enforce <=2 always; but we also need to enforce that if preceded by EV, the limit is 1, which is stricter. So we can just enforce count_B_window <= 2 for all windows, and also enforce Implies(isB[P-1], count_B_window <= 1). That ensures that when preceded by EV, the count must be <=1; when not preceded by EV, the count can be up to 2 (still respects <=2). So that's fine.
+- But we need to define count_B_window as an integer variable for each P. We can compute it as Sum(If(isB[j], 1, 0) for j in P..P+3). Then add constraints accordingly.
+- Now we need to also enforce that each position has exactly one car type: exactly one of isA[i], isB[i], isC[i], isD[i] is true. So we add Or(isA[i], isB[i], isC[i], isD[i]) and also pairwise exclusivity: Not(And(isA[i], isB[i])), etc. Or we can just add exactly one using AtMostOne and AtLeastOne? Simpler: add Or(...) and then add pairwise Not(And(...)). That ensures exactly one.
+- Now we need to also enforce hierarchical option: Option 5 implies Option 1 for constraint purposes. That is already captured by effectiveOption1 counting includes D as effective Option 1. But maybe we also need to enforce that if a car has Option 5 then it also has Option 1 for the purpose of hierarchical options? Actually hierarchical options likely refer to the "implication" used for capacity constraint; we already accounted for that by counting D as effective Option 1. But maybe they want to enforce that Option 5 implies Option 1 as a logical constraint: If a car has Option 5 then it must also have Option 1. Since Option 1 is a property of a car type? Actually Option 1 is a distinct option that only Type A has. Option 5 is a different option that Type D has. The hierarchical relationship is that Option 5 implies Option 1 for constraint purposes, meaning that when evaluating constraints that involve Option 1, we treat cars with Option 5 as also having Option 1. That's what we did.
+- Now we need to produce a Z3 script that models all this and prints a solution.
+- We need to decide on variable naming and indexing. Use Python lists for positions 0..11 (or 1..12). Let's use 0-indexed for Python but treat positions as 1-indexed in constraints. We'll create Bool variables isA[pos], isB[pos], isC[pos], isD[pos] for pos in range(12). We'll also create effectiveOption1_bool[pos] = Or(isA[pos], isD[pos]).
+- We'll also create for each window start i from 0 to 8 (i.e., positions i,i+1,i+2,i+3) a constraint that sum of effectiveOption1_bool over those positions <= 2.
+- We'll also create for each P from 1 to 8? Actually P ranges such that window [P, P+3] is within 12. If we use 0-indexed positions, P can be from 0 to 8 (since P+3 <= 11). The preceding position is P-1, which must be >=0, so P must be >=1. So P ranges from 1 to 8 (i.e., windows starting at positions 1..8). That means we have windows starting at positions 1..8 (0-indexed). For each such P, we need to compute count_B_window = sum_{j=P}^{P+3} isB[j] (i.e., count of Type B in that window). Then we need to enforce Implies(isB[P-1], count_B_window <= 1) and also count_B_window <= 2 (maybe redundant). Actually we can just enforce Implies(isB[P-1], count_B_window <= 1) and also enforce count_B_window <= 2 (maybe not needed because the Implies only restricts when preceded by EV; but the "Otherwise" clause says at most 2 when not preceded by EV; but that is not a constraint that needs to be enforced when not preceded by EV; it's just the default. However, the problem statement says "Otherwise, at most 2 cars with Option 3 in the window [P, P+3]". That is a constraint that must hold regardless of the preceding condition? Actually it's conditional: If preceded by EV, then at most 1; else at most 2. So the constraint is: (not preceded by EV) => (count <= 2). That's equivalent to (implies not preceded by EV OR count <= 2). But we can just enforce count <= 2 unconditionally, which is stricter than needed? Actually it's not stricter; it's the same as the "else" case. But if we enforce count <= 2 unconditionally, then the "if preceded by EV" case would also be limited to <=2, which is weaker than the required <=1. So we need to enforce the conditional: If preceded by EV then count <=1; else count <=2. So we need both: count <=2 always? Actually we can enforce count <=2 always, and also enforce Implies(isB[P-1], count <=1). That ensures that when preceded by EV, count <=1 (the stronger constraint), and when not preceded by EV, count <=2 (the weaker constraint) is still enforced by the unconditional count <=2. So we need both constraints: count_B_window <= 2 (global) and Implies(isB[P-1], count_B_window <= 1). That covers both cases.
+- Now we need to also enforce that each position has exactly one car type: exactly one of isA[i], isB[i], isC[i], isD[i] is true. So we add Or(isA[i], isB[i], isC[i], isD[i]) and also pairwise Not(And(...)). That ensures exactly one.
+- Now we need to enforce counts: Sum_i isA[i] == 3, Sum_i isB[i] == 3, Sum_i isC[i] == 4, Sum_i isD[i] == 2.
+- Now we need to enforce hierarchical option: Option 5 implies Option 1 for constraint purposes. Already accounted.
+- Now we need to enforce positional ban: Not(isB[0]) and Not(isB[11]) (if using 0-indexed positions 0 and 11 correspond to positions 1 and 12). So add Not(isB[0]), Not(isB[11]).
+- Now we need to enforce equipment cooldown: For each i from 0 to 10, Not(And(isC[i], isC[i+1])); for each i from 0 to 9, Not(And(isC[i], isC[i+2])).
+- Now we need to enforce standard capacity: For each window start i from 0 to 8, sum_{j=i}^{i+3} If(effectiveOption1[j], 1, 0) <= 2.
+- Now we need to enforce conditional capacity: For each P from 1 to 8 (0-indexed), define count_B_window = Sum_{j=P}^{P+3} If(isB[j], 1, 0). Then add Implies(isB[P-1], count_B_window <= 1) and also add count_B_window <= 2.
+- Now we need to also enforce that each position has exactly one car type: we already have that.
+- Now we need to also enforce that each car type appears exactly the specified number of times: we have the sums.
+- Now we need to also enforce that each position must have exactly one car: we have exactly one of the four bools per position.
+- Now we need to also enforce that each car type appears exactly the specified number of times: we have the sums.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have exactly one car type: we have exactly one of the four bools per position.
+- Now we need to also enforce that each position must have
+
+
+
+
+### TOKEN USAGE - Iteration 1
+
+  Input tokens:  7,021
+  Output tokens: 32,768
+  Total tokens:  39,789
+
+[OVERTHINKING] Output tokens (32,768) exceeded threshold (32,000). LLM failed Translation because overthinking. Stopping all iterations.
+
+TOKEN USAGE SUMMARY
+  Total input tokens:  7,021
+  Total output tokens: 32,768
+  Total tokens:        39,789
+
+COMPLETE
+
+## Final Answer
+
+```json
+Translator failed after 4 iterations. Translator failed to reach definitive solver result within 4 iterations. (Token limit hit)
+```

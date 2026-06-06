@@ -1,0 +1,63 @@
+# Benchmark Report (MCP): FOLIO - story_459_ex_197
+
+**Provider:** openrouter5
+**Model:** deepseek/deepseek-v4-flash
+**Solver:** vampire
+**Config:** max_output_tokens: 32768, temperature: 0.0, top_p: 1.0, seed: 42, reasoning_enabled: False, reasoning_effort: none
+**Duration:** 33.03s
+
+
+ MCP VAMPIRE AGENT - Symbolic Reasoning
+
+### Query
+Consider the following logical premises: Jane does not like any animals that bark. All dogs are
+
+animals that bark. Jane likes all animals that jump. If an animal has legs, then it jumps. If an
+animal is terricolous, then it has legs. KiKi is an animal. If KiKi neither jumps nor has legs, then
+KiKi is terricolous or has legs. Conclusion to evaluate: KiKi is a barking dog. Question: Based
+STRICTLY on the premises, is the conclusion True, False, or Uncertain? Return your final answer in
+JSON format like this: {"Conclusion": "True or False or Uncertain in here"}
+
+  - write_and_run_vampire: Write two TPTP problem files (positive claim and negation) and run Vampire 
+on both concurrently to get proof results for both in one iteration.
+Returns a dictionary with 'positive' and 'negative' result objects.
+
+## Iteration 1
+
+
+
+
+### TOKEN USAGE - Iteration 1
+
+  Input tokens:  5,082
+  Output tokens: 666
+  Total tokens:  5,748
+
+### Tool Call: write_and_run_vampire
+
+  Args: {
+  "pos_filename": "pos_problem.p",
+  "pos_code": "% Positive version: Conjecture is \"KiKi is a barking dog\"\n% i.e., dog(kiki) & barks(kiki)\n\nfof(premise_1, axiom, ! [X] : (animal(X) & barks(X) => ~likes(jane, X))).\nfof(premise_2, axiom, ! [X] : (dog(X) => (animal(X) & barks(X)))).\nfof(premise_3, axiom, ! [X] : (animal(X) & jumps(X) => likes(jane, X))).\nfof(premise_4, axiom, ! [X] : (animal(X) & has_legs(X) => jumps(X))).\nfof(premise_5, axiom, ! [X] : (animal(X) & terricolous(X) => has_legs(X))).\nfof(premise_6, axiom, animal(kiki)).\nfof(premise_7, axiom, ! [X] : (animal(X) & ~jumps(X) & ~has_legs(X) => (terricolous(X) | has_legs(X)))).\n\nfof(conjecture, conjecture, (dog(kiki) & barks(kiki))).\n",
+  "neg_filename": "neg_problem.p",
+  "neg_code": "% Negative version: Conjecture is the negation of \"KiKi is a barking dog\"\n% i.e., ~(dog(kiki) & barks(kiki)) which is equivalent to ~dog(kiki) | ~barks(kiki)\n\nfof(premise_1, axiom, ! [X] : (animal(X) & barks(X) => ~likes(jane, X))).\nfof(premise_2, axiom, ! [X] : (dog(X) => (animal(X) & barks(X)))).\nfof(premise_3, axiom, ! [X] : (animal(X) & jumps(X) => likes(jane, X))).\nfof(premise_4, axiom, ! [X] : (animal(X) & has_legs(X) => jumps(X))).\nfof(premise_5, axiom, ! [X] : (animal(X) & terricolous(X) => has_legs(X))).\nfof(premise_6, axiom, animal(kiki)).\nfof(premise_7, axiom, ! [X] : (animal(X) & ~jumps(X) & ~has_legs(X) => (terricolous(X) | has_legs(X)))).\n\nfof(conjecture, conjecture, (~dog(kiki) | ~barks(kiki))).\n"
+}
+
+#### Result
+
+[{'type': 'text', 'text': '{"positive":{"status":"success","szs_status":"CounterSatisfiable","stdout":"% SZS status CounterSatisfiable for pos_problem\\n% SZS output start Saturation.\\n% SZS output end Saturation.\\n% SZS output start Definitions and Model Updates.\\nfor all inputs,\\n    define terricolous(X0) := $true\\nfor all inputs,\\n    define animal(X0) := $true\\nfor all inputs,\\n    define has_legs(X0) := $true\\nfor all inputs,\\n    define jumps(X0) := $true\\nfor all inputs,\\n    define likes(X0,X1) := $true\\nfor all inputs,\\n    define barks(X0) := $false\\nfor all inputs,\\n    define dog(X0) := $false\\n% SZS output end Definitions and Model Updates.\\n% Termination reason: Satisfiable","stderr":null,"returncode":0},"negative":{"status":"success","szs_status":"Theorem","stdout":"% Refutation found. Thanks to Tanya!\\n% SZS status Theorem for neg_problem\\n% SZS output start Proof for neg_problem\\n1. ! [X0] : ((barks(X0) & animal(X0)) => ~likes(jane,X0)) [input(axiom)]\\n3. ! [X0] : ((jumps(X0) & animal(X0)) => likes(jane,X0)) [input(axiom)]\\n4. ! [X0] : ((has_legs(X0) & animal(X0)) => jumps(X0)) [input(axiom)]\\n5. ! [X0] : ((terricolous(X0) & animal(X0)) => has_legs(X0)) [input(axiom)]\\n6. animal(kiki) [input(axiom)]\\n7. ! [X0] : ((~has_legs(X0) & ~jumps(X0) & animal(X0)) => (terricolous(X0) | has_legs(X0))) [input(axiom)]\\n8. ~dog(kiki) | ~barks(kiki) [input(conjecture)]\\n9. ~(~dog(kiki) | ~barks(kiki)) [negated conjecture 8]\\n10. ! [X0] : (~likes(jane,X0) | (~barks(X0) | ~animal(X0))) [ennf transformation 1]\\n11. ! [X0] : (~likes(jane,X0) | ~barks(X0) | ~animal(X0)) [flattening 10]\\n13. ! [X0] : (likes(jane,X0) | (~jumps(X0) | ~animal(X0))) [ennf transformation 3]\\n14. ! [X0] : (likes(jane,X0) | ~jumps(X0) | ~animal(X0)) [flattening 13]\\n15. ! [X0] : (jumps(X0) | (~has_legs(X0) | ~animal(X0))) [ennf transformation 4]\\n16. ! [X0] : (jumps(X0) | ~has_legs(X0) | ~animal(X0)) [flattening 15]\\n17. ! [X0] : (has_legs(X0) | (~terricolous(X0) | ~animal(X0))) [ennf transformation 5]\\n18. ! [X0] : (has_legs(X0) | ~terricolous(X0) | ~animal(X0)) [flattening 17]\\n19. ! [X0] : ((terricolous(X0) | has_legs(X0)) | (has_legs(X0) | jumps(X0) | ~animal(X0))) [ennf transformation 7]\\n20. ! [X0] : (terricolous(X0) | has_legs(X0) | has_legs(X0) | jumps(X0) | ~animal(X0)) [flattening 19]\\n21. dog(kiki) & barks(kiki) [ennf transformation 9]\\n22. ~likes(jane,X0) | ~barks(X0) | ~animal(X0) [cnf transformation 11]\\n25. likes(jane,X0) | ~jumps(X0) | ~animal(X0) [cnf transformation 14]\\n26. ~has_legs(X0) | jumps(X0) | ~animal(X0) [cnf transformation 16]\\n27. ~terricolous(X0) | has_legs(X0) | ~animal(X0) [cnf transformation 18]\\n28. animal(kiki) [cnf transformation 6]\\n29. terricolous(X0) | has_legs(X0) | has_legs(X0) | jumps(X0) | ~animal(X0) [cnf transformation 20]\\n30. barks(kiki) [cnf transformation 21]\\n32. ~animal(X0) | has_legs(X0) | jumps(X0) | terricolous(X0) [duplicate literal removal 29]\\n35. ~jumps(X0) | ~animal(X0) | ~barks(X0) | ~animal(X0) [resolution 25,22]\\n36. ~jumps(X0) | ~animal(X0) | ~barks(X0) [duplicate literal removal 35]\\n37. has_legs(kiki) | jumps(kiki) | terricolous(kiki) [resolution 32,28]\\n39. 1 <=> terricolous(kiki) [avatar definition]\\n41. terricolous(kiki) <- (1) [avatar component clause 39]\\n43. 2 <=> jumps(kiki) [avatar definition]\\n44. ~jumps(kiki) <- (~2) [avatar component clause 43]\\n45. jumps(kiki) <- (2) [avatar component clause 43]\\n47. 3 <=> has_legs(kiki) [avatar definition]\\n48. ~has_legs(kiki) <- (~3) [avatar component clause 47]\\n49. has_legs(kiki) <- (3) [avatar component clause 47]\\n50. 1 | 2 | 3 [avatar split clause 37,47,43,39]\\n51. ~animal(kiki) | ~barks(kiki) <- (2) [resolution 36,45]\\n52. ~barks(kiki) <- (2) [forward subsumption resolution 51,28]\\n53. $false <- (2) [forward subsumption resolution 52,30]\\n54. ~2 [avatar contradiction clause 53]\\n55. jumps(kiki) | ~animal(kiki) <- (3) [resolution 49,26]\\n56. ~animal(kiki) <- (~2, 3) [forward subsumption resolution 55,44]\\n57. $false <- (~2, 3) [forward subsumption resolution 56,28]\\n58. 2 | ~3 [avatar contradiction clause 57]\\n59. has_legs(kiki) | ~animal(kiki) <- (1) [resolution 41,27]\\n60. ~animal(kiki) <- (1, ~3) [forward subsumption resolution 59,48]\\n61. $false <- (1, ~3) [forward subsumption resolution 60,28]\\n62. ~1 | 3 [avatar contradiction clause 61]\\ns1. 1 | 2 | 3 [sat_conversion 50]\\ns2. ~2 [sat_conversion 54]\\ns3. ~3 | 2 [sat_conversion 58]\\ns4. ~1 | 3 [sat_conversion 62]\\ns5. ~3 [rat s3,s2]\\ns6. ~1 [rat s4,s5]\\ns7. # [rat s1,s5,s2,s6]\\n63. $false [avatar sat refutation s7]\\n% SZS output end Proof for neg_problem\\n% Termination reason: Refutation","stderr":null,"returncode":0}}', 'id': 'lc_f8e67a04-46aa-43d5-a15c-4f39d01f29f3'}]
+
+
+[NOTE] Skipping Answer Phase for FOLIO benchmark as solver returns verdict directly.
+
+TOKEN USAGE SUMMARY
+  Total input tokens:  5,082
+  Total output tokens: 666
+  Total tokens:        5,748
+
+COMPLETE
+
+## Final Answer
+
+```json
+[{'type': 'text', 'text': '{"positive":{"status":"success","szs_status":"CounterSatisfiable","stdout":"% SZS status CounterSatisfiable for pos_problem\\n% SZS output start Saturation.\\n% SZS output end Saturation.\\n% SZS output start Definitions and Model Updates.\\nfor all inputs,\\n    define terricolous(X0) := $true\\nfor all inputs,\\n    define animal(X0) := $true\\nfor all inputs,\\n    define has_legs(X0) := $true\\nfor all inputs,\\n    define jumps(X0) := $true\\nfor all inputs,\\n    define likes(X0,X1) := $true\\nfor all inputs,\\n    define barks(X0) := $false\\nfor all inputs,\\n    define dog(X0) := $false\\n% SZS output end Definitions and Model Updates.\\n% Termination reason: Satisfiable","stderr":null,"returncode":0},"negative":{"status":"success","szs_status":"Theorem","stdout":"% Refutation found. Thanks to Tanya!\\n% SZS status Theorem for neg_problem\\n% SZS output start Proof for neg_problem\\n1. ! [X0] : ((barks(X0) & animal(X0)) => ~likes(jane,X0)) [input(axiom)]\\n3. ! [X0] : ((jumps(X0) & animal(X0)) => likes(jane,X0)) [input(axiom)]\\n4. ! [X0] : ((has_legs(X0) & animal(X0)) => jumps(X0)) [input(axiom)]\\n5. ! [X0] : ((terricolous(X0) & animal(X0)) => has_legs(X0)) [input(axiom)]\\n6. animal(kiki) [input(axiom)]\\n7. ! [X0] : ((~has_legs(X0) & ~jumps(X0) & animal(X0)) => (terricolous(X0) | has_legs(X0))) [input(axiom)]\\n8. ~dog(kiki) | ~barks(kiki) [input(conjecture)]\\n9. ~(~dog(kiki) | ~barks(kiki)) [negated conjecture 8]\\n10. ! [X0] : (~likes(jane,X0) | (~barks(X0) | ~animal(X0))) [ennf transformation 1]\\n11. ! [X0] : (~likes(jane,X0) | ~barks(X0) | ~animal(X0)) [flattening 10]\\n13. ! [X0] : (likes(jane,X0) | (~jumps(X0) | ~animal(X0))) [ennf transformation 3]\\n14. ! [X0] : (likes(jane,X0) | ~jumps(X0) | ~animal(X0)) [flattening 13]\\n15. ! [X0] : (jumps(X0) | (~has_legs(X0) | ~animal(X0))) [ennf transformation 4]\\n16. ! [X0] : (jumps(X0) | ~has_legs(X0) | ~animal(X0)) [flattening 15]\\n17. ! [X0] : (has_legs(X0) | (~terricolous(X0) | ~animal(X0))) [ennf transformation 5]\\n18. ! [X0] : (has_legs(X0) | ~terricolous(X0) | ~animal(X0)) [flattening 17]\\n19. ! [X0] : ((terricolous(X0) | has_legs(X0)) | (has_legs(X0) | jumps(X0) | ~animal(X0))) [ennf transformation 7]\\n20. ! [X0] : (terricolous(X0) | has_legs(X0) | has_legs(X0) | jumps(X0) | ~animal(X0)) [flattening 19]\\n21. dog(kiki) & barks(kiki) [ennf transformation 9]\\n22. ~likes(jane,X0) | ~barks(X0) | ~animal(X0) [cnf transformation 11]\\n25. likes(jane,X0) | ~jumps(X0) | ~animal(X0) [cnf transformation 14]\\n26. ~has_legs(X0) | jumps(X0) | ~animal(X0) [cnf transformation 16]\\n27. ~terricolous(X0) | has_legs(X0) | ~animal(X0) [cnf transformation 18]\\n28. animal(kiki) [cnf transformation 6]\\n29. terricolous(X0) | has_legs(X0) | has_legs(X0) | jumps(X0) | ~animal(X0) [cnf transformation 20]\\n30. barks(kiki) [cnf transformation 21]\\n32. ~animal(X0) | has_legs(X0) | jumps(X0) | terricolous(X0) [duplicate literal removal 29]\\n35. ~jumps(X0) | ~animal(X0) | ~barks(X0) | ~animal(X0) [resolution 25,22]\\n36. ~jumps(X0) | ~animal(X0) | ~barks(X0) [duplicate literal removal 35]\\n37. has_legs(kiki) | jumps(kiki) | terricolous(kiki) [resolution 32,28]\\n39. 1 <=> terricolous(kiki) [avatar definition]\\n41. terricolous(kiki) <- (1) [avatar component clause 39]\\n43. 2 <=> jumps(kiki) [avatar definition]\\n44. ~jumps(kiki) <- (~2) [avatar component clause 43]\\n45. jumps(kiki) <- (2) [avatar component clause 43]\\n47. 3 <=> has_legs(kiki) [avatar definition]\\n48. ~has_legs(kiki) <- (~3) [avatar component clause 47]\\n49. has_legs(kiki) <- (3) [avatar component clause 47]\\n50. 1 | 2 | 3 [avatar split clause 37,47,43,39]\\n51. ~animal(kiki) | ~barks(kiki) <- (2) [resolution 36,45]\\n52. ~barks(kiki) <- (2) [forward subsumption resolution 51,28]\\n53. $false <- (2) [forward subsumption resolution 52,30]\\n54. ~2 [avatar contradiction clause 53]\\n55. jumps(kiki) | ~animal(kiki) <- (3) [resolution 49,26]\\n56. ~animal(kiki) <- (~2, 3) [forward subsumption resolution 55,44]\\n57. $false <- (~2, 3) [forward subsumption resolution 56,28]\\n58. 2 | ~3 [avatar contradiction clause 57]\\n59. has_legs(kiki) | ~animal(kiki) <- (1) [resolution 41,27]\\n60. ~animal(kiki) <- (1, ~3) [forward subsumption resolution 59,48]\\n61. $false <- (1, ~3) [forward subsumption resolution 60,28]\\n62. ~1 | 3 [avatar contradiction clause 61]\\ns1. 1 | 2 | 3 [sat_conversion 50]\\ns2. ~2 [sat_conversion 54]\\ns3. ~3 | 2 [sat_conversion 58]\\ns4. ~1 | 3 [sat_conversion 62]\\ns5. ~3 [rat s3,s2]\\ns6. ~1 [rat s4,s5]\\ns7. # [rat s1,s5,s2,s6]\\n63. $false [avatar sat refutation s7]\\n% SZS output end Proof for neg_problem\\n% Termination reason: Refutation","stderr":null,"returncode":0}}', 'id': 'lc_f8e67a04-46aa-43d5-a15c-4f39d01f29f3'}]
+```

@@ -1,0 +1,11 @@
+% Positive version with corrected premise7
+fof(premise1, axiom, ! [X] : (works_in_library(X) => ~from_cs_dept(X))).
+fof(premise2, axiom, ! [X] : (part_time_job_univ(X) => works_in_library(X))).
+fof(premise3, axiom, ! [X] : (taking_db_course(X) => from_cs_dept(X))).
+fof(premise4, axiom, ! [X] : (taking_class_with_prof_david(X) => taking_db_course(X))).
+fof(premise5, axiom, ! [X] : (works_in_lab(X) => taking_class_with_prof_david(X))).
+fof(premise6, axiom, works_in_lab(james)).
+% James does not work in the lab and does not have a part-time job offered by the university.
+fof(premise7a, axiom, ~works_in_lab(james)).
+fof(premise7b, axiom, ~part_time_job_univ(james)).
+fof(goal, conjecture, part_time_job_univ(james)).

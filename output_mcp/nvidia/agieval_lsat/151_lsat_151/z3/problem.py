@@ -1,0 +1,95 @@
+from z3 import *
+
+solver = Solver()
+
+# Declare color assignment variables (rug index: 0,1,2 or -1=unused)
+f, o, p, t, w, y = Int('f'), Int('o'), Int('p'), Int('t'), Int('w'), Int('y')
+
+# Domain: each color is either unused (-1) or assigned to rug 0,1,2
+for var in (f, o, p, t, w, y):
+    solver.add(Or(var == -1, var == 0, var == 1, var == 2))
+
+# Exactly five colors are used (one color unused)
+used_count = If(f != -1, 1, 0) + If(o != -1, 1, 0) + If(p != -1, 1, 0) + \
+             If(t != -1, 1, 0) + If(w != -1, 1, 0) + If(y != -1, 1, 0)
+solver.add(used_count == 5)
+
+# Pairwise exclusion constraints
+solver.add(f != t)   # forest and turquoise not together
+solver.add(p != t)   # peach and turquoise not together
+solver.add(p != y)   # peach and yellow not together
+
+# Olive implies peach (same rug)
+solver.add(Or(o == -1, And(p != -1, p == o)))
+
+# White rule: if white is used, exactly three colors share its rug
+count_white = If(f == w, 1, 0) + If(o == w, 1, 0) + If(p == w, 1, 0) + \
+              If(t == w, 1, 0) + If(w == w, 1, 0) + If(y == w, 1, 0)
+solver.add(Or(w == -1, count_white == 3))
+
+# One rug is solid peach (peach alone on its rug)
+solid_peach = Or(
+    And(p == 0, o != 0, f != 0, t != 0, w != 0, y != 0),
+    And(p == 1, o != 1, f != 1, t != 1, w != 1, y != 1),
+    And(p == 2, o != 2, f != 2, t != 2, w != 2, y != 2)
+)
+solver.add(solid_peach)
+
+# Answer choice constraints
+solid_forest = Or(
+    And(f == 0, o != 0, p != 0, t != 0, w != 0, y != 0),
+    And(f == 1, o != 1, p != 1, t != 1, w != 1, y != 1),
+    And(f == 2, o != 2, p != 2, t != 2, w != 2, y != 2)
+)
+
+solid_turquoise = Or(
+    And(t == 0, o != 0, f != 0, p != 0, w != 0, y != 0),
+    And(t == 1, o != 1, f != 1, p != 1, w != 1, y != 1),
+    And(t == 2, o != 2, f != 2, p != 2, w != 2, y != 2)
+)
+
+solid_yellow = Or(
+    And(y == 0, o != 0, f != 0, p != 0, t != 0, w != 0),
+    And(y == 1, o != 1, f != 1, p != 1, t != 1, w != 1),
+    And(y == 2, o != 2, f != 2, p != 2, w != 2, y != 2)
+)
+
+forest_white_together = Or(
+    And(f == 0, w == 0),
+    And(f == 1, w == 1),
+    And(f == 2, w == 2)
+)
+
+white_yellow_together = Or(
+    And(w == 0, y == 0),
+    And(w == 1, y == 1),
+    And(w == 2, y == 2)
+)
+
+# Evaluate each answer choice
+options = [
+    ("A", solid_forest),
+    ("B", solid_turquoise),
+    ("C", solid_yellow),
+    ("D", forest_white_together),
+    ("E", white_yellow_together)
+]
+
+found_options = []
+for letter, constr in options:
+    solver.push()
+    solver.add(constr)
+    if solver.check() == sat:
+        found_options.append(letter)
+    solver.pop()
+
+# Output according to the required multiple-choice skeleton
+if len(found_options) == 1:
+    print("STATUS: sat")
+    print(f"answer:{found_options[0]}")
+elif len(found_options) > 1:
+    print("STATUS: unsat")
+    print(f"Refine: Multiple options found {found_options}")
+else:
+    print("STATUS: unsat")
+    print("Refine: No options found")

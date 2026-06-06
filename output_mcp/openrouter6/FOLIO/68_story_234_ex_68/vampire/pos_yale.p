@@ -1,0 +1,6 @@
+% Positive file: Pierson College is a residential college at Yale
+fof(premise1, axiom, university(yale) & private(yale) & ivy_league(yale) & research(yale)).
+fof(premise2, axiom, moved_to(yale, new_haven, 1716)).
+fof(premise3, axiom, endowment_value(yale, 42_3_billion)).
+fof(premise4, axiom, residential_college_of(benjamin_franklin_college, yale) & residential_college_of(berkeley_college, yale) & residential_college_of(branford_college, yale) & residential_college_of(davenport_college, yale) & residential_college_of(ezra_stiles_college, yale) & residential_college_of(grace_hopper_college, yale) & residential_college_of(jonathan_edwards_college, yale) & residential_college_of(morse_college, yale) & residential_college_of(pauli_murray_college, yale) & residential_college_of(pierson_college, yale) & residential_college_of(saybrook_college, yale) & residential_college_of(silliman_college, yale) & residential_college_of(timothy_dwight_college, yale) & residential_college_of(trumbull_college, yale)).
+fof(goal, conjecture, residential_college_of(pierson_college, yale)).

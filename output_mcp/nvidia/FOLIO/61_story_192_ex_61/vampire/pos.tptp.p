@@ -1,0 +1,1 @@
+fof(premise1, axiom, ((international_student(X) & in_us(X)) => (f1(X) | j1(X))).\nfof(premise2, axiom, ((international_student(X) & in_us(X) & f1(X) & wants_to_work(X)) => (apply_cpt(X) | apply_opt(X))).\nfof(premise3, axiom, international_student(mike)).\nfof(premise4, axiom, wants_to_work(mike) => apply_cpt(mike)).\nfof(conjecture, conjecture, f1(mike)).

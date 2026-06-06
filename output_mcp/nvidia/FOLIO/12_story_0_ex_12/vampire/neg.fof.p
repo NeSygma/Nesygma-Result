@@ -1,0 +1,1 @@
+fof(axiom_1, axiom, ~eastern_wild_turkey(tom)).\nfof(axiom_2, axiom, ~osceola_wild_turkey(tom)).\nfof(axiom_3, axiom, ~goulds_wild_turkey(tom)).\nfof(axiom_4, axiom, ~merriam_wild_turkey(tom)).\nfof(axiom_5, axiom, ~rio_grande_wild_turkey(tom)).\nfof(axiom_6, axiom, wild_turkey(tom)).\nfof(conclusion, conjecture, ~wild_turkey(joey)).
