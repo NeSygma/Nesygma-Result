@@ -7,10 +7,10 @@ This repository contains the experimental results and analysis scripts for the *
 ## Repository Structure
 
 Distinct execution steps store their logs independently for tracing and evaluation:
-- `output_system1/`: Direct System 1 reasoning outputs.
-- `output_switcher/`: Switcher confidence and evaluation results.
-- `output_selector/`: Selected top-tier solvers per problem.
-- `output_mcp/`: System 2 execution artifacts for the selected solver(s).
+- `output_system1/`: System 1 Component Result.
+- `output_switcher/`: Metacognition Component Result
+- `output_selector/`: Selector Component
+- `output_mcp/`: Solver Component Result.
 
 ## Supported Providers
 
